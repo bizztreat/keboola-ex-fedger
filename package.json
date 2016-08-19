@@ -31,6 +31,7 @@
     "commander": "^2.9.0",
     "fast-csv": "^2.1.0",
     "is-there": "^4.3.3",
+    "jsonfile": "^2.3.1",
     "lodash": "^4.15.0",
     "nconf": "^0.8.4",
     "request": "^2.74.0",

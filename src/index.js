@@ -10,7 +10,8 @@ import {
 import {
   getUrl,
   fetchData,
-  createOutputFile
+  createOutputFile,
+  createManifestFile
 } from './helpers/fedgerHelper';
 import {
   CONFIG_FILE,
@@ -27,6 +28,8 @@ import {
     const {
       city,
       apiKey,
+      tableName,
+      bucketName,
       stopAfterReachPage
     } = await parseConfiguration(getConfig(path.join(command.data, CONFIG_FILE)));
     // Specification of the initial url.
@@ -34,7 +37,11 @@ import {
     let hasMoreRecords = true;
     do {
       let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
-      const result = await createOutputFile(`${path.join(command.data, DEFAULT_TABLES_OUT_DIR)}/EntityTest.csv`, data, page);
+      const fileName = `${path.join(command.data, DEFAULT_TABLES_OUT_DIR)}/${tableName}.csv`;
+      const destination = `${bucketName}.${tableName}`;
+      const incremental = false;
+      const result = await createOutputFile(fileName, data, page);
+      const manifest = await createManifestFile(`${fileName}.manifest`, { destination, incremental });
       hasMoreRecords = stopAfterReachPage && stopAfterReachPage === page ? false : hasMore;
     } while (hasMoreRecords);
     console.log(`Data for '${city}' downloaded!`);

@@ -12,6 +12,14 @@ export function parseConfiguration(configObject) {
     if (isUndefined(apiKey)) {
       reject('Parameter #apiKey missing from input configuration! Please check out the documentation for more information!');
     }
+    const bucketName = configObject.get('parameters:bucketName');
+    if (isUndefined(bucketName)) {
+      reject('Parameter bucketName missing from input configuration! Please check out the documentation for more information!');
+    }
+    const tableName = configObject.get('parameters:tableName');
+    if (isUndefined(tableName)) {
+      reject('Parameter tableName missing from input configuration! Please check out the documentation for more information!');
+    }
     const city = configObject.get('parameters:city');
     if (isUndefined(city)) {
       reject('Parameter city missing from input configuration! Please check out the documentation for more information!');
@@ -20,6 +28,8 @@ export function parseConfiguration(configObject) {
     resolve({
       city,
       apiKey,
+      tableName,
+      bucketName,
       stopAfterReachPage
     })
   });

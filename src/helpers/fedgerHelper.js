@@ -1,5 +1,6 @@
 import fs from 'fs';
 import csv from 'fast-csv';
+import jsonfile from 'jsonfile';
 import limit from 'simple-rate-limiter';
 const request = limit(require("request")).to(40).per(60000);
 
@@ -34,5 +35,21 @@ export function createOutputFile(fileName, data, pageNumber) {
     csv
       .writeToStream(fs.createWriteStream(fileName, {'flags': 'a'}), data, { headers: pageNumber === 1, includeEndRowDelimiter: true })
       .on("finish", () => resolve('fileCreated'));
+  });
+}
+
+
+/**
+ * This function simply create a manifest file related to the output data
+ */
+export function createManifestFile(fileName, data) {
+  return new Promise((resolve, reject) => {
+    jsonfile.writeFile(fileName, data, {}, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve('manifest created!');
+      }
+    });
   });
 }
