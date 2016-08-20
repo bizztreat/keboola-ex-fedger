@@ -4,6 +4,7 @@ import command from './helpers/cliHelper';
 import {
   getConfig
 } from './helpers/configHelper';
+import { size } from 'lodash';
 import {
   getTableName,
   parseConfiguration
@@ -20,9 +21,11 @@ import {
 } from './helpers/fedgerHelper';
 import {
   CONFIG_FILE,
+  PEERS_PREFIX,
   CONTACT_PREFIX,
   PROFILE_PREFIX,
   METRICS_PREFIX,
+  CLUSTERS_PREFIX,
   ENTITIES_PREFIX,
   LOCATION_PREFIX,
   FEDGER_API_BASE_URL,
@@ -67,7 +70,7 @@ import {
       const manifest = await createManifestFile(`${fileName}.manifest`, { destination, incremental });
       console.log(`Data for '${city}' downloaded and stored in '${destination}'!`);
     }
-    // Another steps is to read the complete dataset of entities,
+    // Another step is to read the complete dataset of entities,
     // either from dataset that had been downloaded
     // or input file specified in the configuration.
     const fileName = readEntitiesFromFile
@@ -75,6 +78,7 @@ import {
       : `${tableOutDir}/${getTableName(ENTITIES_PREFIX, city)}.csv`;
     // Read a list of entities ids.
     const entities = await readEntityFileContent(fileName);
+
     const expand = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ];
     // We need to prepare tablesName.
     const expandMetadata = expand.map(prefix => {
@@ -82,7 +86,6 @@ import {
       return { [`${prefix}`]: { tableName, destination: `${bucketName}.${prefix}`, fileName: `${tableOutDir}/${tableName}.csv`, incremental }};
     });
     const expandMetadataObject = convertArrayOfObjectsToObject(expandMetadata);
-
     for (const entityId of entities) {
       const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(expand.join(','))}`
       const { location, contact, profile, metrics } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
@@ -91,6 +94,38 @@ import {
     // Create manifest files as well.
     const expandFilesManifests = await Promise.all(createMultipleManifests(expandMetadataObject));
     console.log(`Expanded city details downloaded!`);
+    // Clusters are next step to download. The only extra step is to extend the response by adding a parentId into array of objects.
+    const clustersTableName = getTableName(CLUSTERS_PREFIX, city);
+    const clustersDestination = `${bucketName}.${clustersTableName}`;
+    const clustersFileName = `${tableOutDir}/${clustersTableName}.csv`;
+    for (const entityId of entities) {
+      const next = `/v0.2/entity/${entityId}/clusters`;
+      const clusters = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+      const data = clusters.data.map(cluster => Object.assign({}, cluster, { parentId: clusters.entity }));
+      const result = await createOutputFile(clustersFileName, data);
+    }
+    const clustersManifest = await createManifestFile(`${clustersFileName}.manifest`, { destination: clustersDestination, incremental });
+    console.log(`Clusters data downloaded!`);
+
+    // Last part is about getting the peers for particular entity.
+    // We need to use multiple loops in order to iterate overs entities and multiple pages.
+    const peersTableName = getTableName(PEERS_PREFIX, city);
+    const peersDestination = `${bucketName}.${peersTableName}`;
+    const peersFileName = `${tableOutDir}/${peersDestination}.csv`;
+    for (const entityId of entities) {
+      const init = `/v0.2/entity/${entityId}/peers?page=1&limit=10`;
+      let hasMoreRecords = false;
+      do {
+        let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+        const peersData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));
+        const result = size(peersData) > 0
+          ? await createOutputFile(peersFileName, peersData)
+          : null;
+        hasMoreRecords = stopAfterReachingPage && stopAfterReachingPage === page ? false : hasMore;
+      } while (hasMoreRecords);
+    }
+    const peersManifest = await createManifestFile(`${peersFileName}.manifest`, { destination: peersDestination, incremental });
+    console.log(`Peers data downloaded!`);
 
     process.exit(0);
   } catch (error) {

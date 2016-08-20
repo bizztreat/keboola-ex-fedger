@@ -2,11 +2,11 @@
 import {
   size,
   first,
+  isArray,
   toLower,
   snakeCase,
   isUndefined
 } from 'lodash';
-
 /**
  * This is a simple helper that checks whether the input configuration is valid.
  * If so, the particular object with relevant parameters is returned.
@@ -16,6 +16,12 @@ export function parseConfiguration(configObject) {
   return new Promise((resolve, reject) => {
     // Read information from the input files.
     const inputFiles = configObject.get('storage:input:tables');
+    // Datasets are related to the downloading part. Sometimes we don't need to download everything at once.
+    // It can be undefined, but if it's defined, it must be an array.
+    const datasets = configObject.get('parameters:datasets');
+    if (!isUndefined(datasets) && !isArray(datasets)) {
+      reject('Please specify the datasets parameter as an array! Check out the documentation for more details!');
+    }
     // Check whether the user wishes to read entities from an input file (default false)
     const readEntitiesFromFile = configObject.get('parameters:readEntitiesFromFile') || false;
     // If a user wants to load entities from a file, an input file must be selected.
@@ -42,6 +48,7 @@ export function parseConfiguration(configObject) {
     resolve({
       city,
       apiKey,
+      datasets,
       bucketName,
       inputFileName,
       readEntitiesFromFile,

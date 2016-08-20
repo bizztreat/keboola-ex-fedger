@@ -14,10 +14,21 @@ import {
 } from '../constants';
 
 /**
+ * This function simply generate a query string symbol
+ */
+function getQueryStringSymbol(uri) {
+  if (uri.indexOf('?') > 0 || uri.indexOf('&') > 0) {
+    return '&';
+  } else {
+    return '?';
+  }
+}
+
+/**
  * This function builds the url for downloads.
  */
 export function getUrl(baseUrl, init, uri = init, apiKey) {
-  return `${baseUrl}/${uri}&apikey=${apiKey}`;
+  return `${baseUrl}/${uri}${getQueryStringSymbol(uri)}apikey=${apiKey}`;
 }
 
 /**
@@ -67,7 +78,6 @@ export function createMultipleFiles(inputMetadata, data) {
  */
 export function createManifestFile(fileName, data) {
   return new Promise((resolve, reject) => {
-    console.log(data);
     jsonfile.writeFile(fileName, data, {}, (error) => {
       if (error) {
         reject(error);

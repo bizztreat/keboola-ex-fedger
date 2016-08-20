@@ -14,6 +14,8 @@ export const LOCATION_PREFIX = 'location';
 export const CONTACT_PREFIX = 'contact';
 export const PROFILE_PREFIX = 'profile';
 export const METRICS_PREFIX = 'metrics';
+export const CLUSTERS_PREFIX = 'clusters';
+export const PEERS_PREFIX = 'peers';
 
 /**
  * Events constants
