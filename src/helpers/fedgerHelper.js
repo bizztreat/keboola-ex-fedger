@@ -3,6 +3,7 @@ import csv from 'fast-csv';
 import isThere from 'is-there';
 import jsonfile from 'jsonfile';
 import limit from 'simple-rate-limiter';
+import { isInteger, toNumber, first, keys } from 'lodash';
 const request = limit(require("request")).to(40).per(60000);
 import {
   EVENT_END,
@@ -11,8 +12,6 @@ import {
   EVENT_FINISH,
   EVENT_INVALID_DATA
 } from '../constants';
-
-import { isInteger, toNumber } from 'lodash';
 
 /**
  * This function builds the url for downloads.
@@ -46,7 +45,20 @@ export function createOutputFile(fileName, data) {
     const includeEndRowDelimiter = true;
     csv
       .writeToStream(fs.createWriteStream(fileName, {'flags': 'a'}), data, { headers, includeEndRowDelimiter })
+      .on(EVENT_ERROR, () => reject('Problem with writing data into output!'))
       .on(EVENT_FINISH, () => resolve('File created!'));
+  });
+}
+
+/**
+ * This function creates an array of promises that leads to creating multiple files.
+ */
+export function createMultipleFiles(inputMetadata, data) {
+  return keys(inputMetadata).map(key => {
+    return new Promise(resolve => {
+      createOutputFile(inputMetadata[key].fileName, [ data[key] ]);
+      resolve(`${key} updated!`);
+    });
   });
 }
 
@@ -55,12 +67,28 @@ export function createOutputFile(fileName, data) {
  */
 export function createManifestFile(fileName, data) {
   return new Promise((resolve, reject) => {
+    console.log(data);
     jsonfile.writeFile(fileName, data, {}, (error) => {
       if (error) {
         reject(error);
       } else {
         resolve('Manifest created!');
       }
+    });
+  });
+}
+
+/**
+ * This function creates an array of promises that leads to creating multiple manifest files.
+ */
+export function createMultipleManifests(inputMetadata) {
+  return keys(inputMetadata).map(key => {
+    return new Promise(resolve => {
+      const fileName = `${inputMetadata[key].fileName}.manifest`;
+      const { destination, incremental } = inputMetadata[key];
+      createManifestFile(fileName, { destination, incremental })
+        .then(result => resolve(`${key} manifest created!`))
+        .catch(error => reject(error));
     });
   });
 }
@@ -83,4 +111,15 @@ export function readEntityFileContent(file) {
       .on(EVENT_DATA, data => result.push(data))
       .on(EVENT_END, () => resolve(result));
   });
+}
+
+/**
+ * This function simply converts array of objects into single object.
+ */
+export function convertArrayOfObjectsToObject(inputArray) {
+  return inputArray.reduce((previous, current) => {
+    let key = first(Object.keys(current));
+    previous[key] = current[key];
+    return previous;
+  }, {});
 }

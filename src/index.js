@@ -13,7 +13,10 @@ import {
   fetchData,
   createOutputFile,
   createManifestFile,
-  readEntityFileContent
+  createMultipleFiles,
+  readEntityFileContent,
+  createMultipleManifests,
+  convertArrayOfObjectsToObject
 } from './helpers/fedgerHelper';
 import {
   CONFIG_FILE,
@@ -72,33 +75,21 @@ import {
       : `${tableOutDir}/${getTableName(ENTITIES_PREFIX, city)}.csv`;
     // Read a list of entities ids.
     const entities = await readEntityFileContent(fileName);
-    const expand = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ].join(',');
+    const expand = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ];
     // We need to prepare tablesName.
-    const locationTableName = getTableName(LOCATION_PREFIX, city);
-    const locationDestination = `${bucketName}.${locationTableName}`;
-    const locationFileName = `${tableOutDir}/${locationTableName}.csv`;
-    const contactTableName = getTableName(CONTACT_PREFIX, city);
-    const contactDestination = `${bucketName}.${contactTableName}`;
-    const contactFileName = `${tableOutDir}/${contactTableName}.csv`;
-    const profileTableName = getTableName(PROFILE_PREFIX, city);
-    const profileDestination = `${bucketName}.${profileTableName}`;
-    const profileFileName = `${tableOutDir}/${profileTableName}.csv`;
-    const metricsTableName = getTableName(METRICS_PREFIX, city);
-    const metricsDestination = `${bucketName}.${metricsTableName}`;
-    const metricsFileName = `${tableOutDir}/${metricsTableName}.csv`;
+    const expandMetadata = expand.map(prefix => {
+      const tableName = getTableName(prefix, city);
+      return { [`${prefix}`]: { tableName, destination: `${bucketName}.${prefix}`, fileName: `${tableOutDir}/${tableName}.csv`, incremental }};
+    });
+    const expandMetadataObject = convertArrayOfObjectsToObject(expandMetadata);
+
     for (const entityId of entities) {
-      const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(expand)}`
+      const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(expand.join(','))}`
       const { location, contact, profile, metrics } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-      const locationResult = await createOutputFile(locationFileName, [ location ]);
-      const contactResult = await createOutputFile(contactFileName, [ contact ]);
-      const profileResult = await createOutputFile(profileFileName, [ profile ]);
-      const metricsResult = await createOutputFile(metricsFileName, [ metrics ]);
+      const outputFiles = await Promise.all(createMultipleFiles(expandMetadataObject, { location, contact, profile, metrics }));
     }
     // Create manifest files as well.
-    const locationManifest = await createManifestFile(`${locationFileName}.manifest`, { destination: locationDestination, incremental });
-    const contactManifest = await createManifestFile(`${contactFileName}.manifest`, { destination: contactDestination, incremental });
-    const profileManifest = await createManifestFile(`${profileFileName}.manifest`, { destination: profileDestination, incremental });
-    const metricsManifest = await createManifestFile(`${metricsFileName}.manifest`, { destination: metricsDestination, incremental });
+    const expandFilesManifests = await Promise.all(createMultipleManifests(expandMetadataObject));
     console.log(`Expanded city details downloaded!`);
 
     process.exit(0);
