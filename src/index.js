@@ -1,23 +1,15 @@
 'use strict';
 import path from 'path';
 import command from './helpers/cliHelper';
+import { size, includes } from 'lodash';
+import { getConfig } from './helpers/configHelper';
+import { parseConfiguration } from './helpers/keboolaHelper';
 import {
-  getConfig
-} from './helpers/configHelper';
-import { size } from 'lodash';
-import {
-  getTableName,
-  parseConfiguration
-} from './helpers/keboolaHelper';
-import {
-  getUrl,
-  fetchData,
-  createOutputFile,
-  createManifestFile,
-  createMultipleFiles,
   readEntityFileContent,
-  createMultipleManifests,
-  convertArrayOfObjectsToObject
+  downloadDataForEntities,
+  downloadPeersForEntities,
+  downloadClustersForEntities,
+  downloadExpandedDataForEntities
 } from './helpers/fedgerHelper';
 import {
   CONFIG_FILE,
@@ -28,11 +20,10 @@ import {
   CLUSTERS_PREFIX,
   ENTITIES_PREFIX,
   LOCATION_PREFIX,
-  FEDGER_API_BASE_URL,
+  ENTITY_DETAILS_PREFIX,
   DEFAULT_TABLES_IN_DIR,
   DEFAULT_TABLES_OUT_DIR
 } from './constants';
-
 /**
  * This is the main part of the program.
  */
@@ -42,91 +33,51 @@ import {
     const {
       city,
       apiKey,
+      datasets,
+      startPage,
       bucketName,
+      incremental,
+      maximalPage,
       inputFileName,
-      readEntitiesFromFile,
-      stopAfterReachingPage
+      readEntitiesFromFile
     } = await parseConfiguration(getConfig(path.join(command.data, CONFIG_FILE)));
-
     // Prepare table directories.
     const tableInDir = path.join(command.data, DEFAULT_TABLES_IN_DIR);
     const tableOutDir = path.join(command.data, DEFAULT_TABLES_OUT_DIR);
-    // It is going to be always a full upload.
-    const incremental = false;
+    // First of all, we need to check whether running of this component does make a sense.
+    // If user select reading of the entity source data from the file, but the datasets array is empty,
+    // we don't need to run the component, as no new data are going to be downloaded.
+    if (readEntitiesFromFile && size(datasets) === 0) {
+      console.log('Nothing to download! Please make sure the datasets array in the configuration contains some data and/or the readEntitiesFromFile attribute is set to false!');
+      process.exit(0);
+    }
     // If we do want to load the entities from the input, we can skip this step.
     if (!readEntitiesFromFile) {
       // Specification of the initial url.
-      const init = `/v0.2/entity/search?page=1&limit=10&city=${encodeURIComponent(city.toLowerCase())}`;
-      let hasMoreRecords = false;
-      const tableName = getTableName(ENTITIES_PREFIX, city);
-      const destination = `${bucketName}.${tableName}`;
-      const fileName = `${tableOutDir}/${tableName}.csv`;
-      do {
-        let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
-        const result = await createOutputFile(fileName, data);
-        hasMoreRecords = stopAfterReachingPage && stopAfterReachingPage === page ? false : hasMore;
-      } while (hasMoreRecords);
-      // If data is successfully downloaded, we can create a manifest file.
-      const manifest = await createManifestFile(`${fileName}.manifest`, { destination, incremental });
-      console.log(`Data for '${city}' downloaded and stored in '${destination}'!`);
+      const result = await downloadDataForEntities(ENTITIES_PREFIX, tableOutDir, city, bucketName, apiKey, startPage, maximalPage);
+      console.log(result);
     }
-    // Another step is to read the complete dataset of entities,
-    // either from dataset that had been downloaded
-    // or input file specified in the configuration.
-    const fileName = readEntitiesFromFile
-      ? `${tableInDir}/${inputFileName}`
-      : `${tableOutDir}/${getTableName(ENTITIES_PREFIX, city)}.csv`;
-    // Read a list of entities ids.
-    const entities = await readEntityFileContent(fileName);
+    // Next step is to load the content of the input (entities) file.
+    // We are going to use the one downloaded from API recently
+    // or the one selected in the input configuration.
+    const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city });
+    // Following steps all depends on selected datasets.
+    if (includes(datasets, ENTITY_DETAILS_PREFIX)) {
+      const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ];
+      const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey);
+      console.log(result);
+    }
 
-    const expand = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ];
-    // We need to prepare tablesName.
-    const expandMetadata = expand.map(prefix => {
-      const tableName = getTableName(prefix, city);
-      return { [`${prefix}`]: { tableName, destination: `${bucketName}.${prefix}`, fileName: `${tableOutDir}/${tableName}.csv`, incremental }};
-    });
-    const expandMetadataObject = convertArrayOfObjectsToObject(expandMetadata);
-    for (const entityId of entities) {
-      const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(expand.join(','))}`
-      const { location, contact, profile, metrics } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-      const outputFiles = await Promise.all(createMultipleFiles(expandMetadataObject, { location, contact, profile, metrics }));
+    if (includes(datasets, CLUSTERS_PREFIX)) {
+      const result = await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey);
+      console.log(result);
     }
-    // Create manifest files as well.
-    const expandFilesManifests = await Promise.all(createMultipleManifests(expandMetadataObject));
-    console.log(`Expanded city details downloaded!`);
-    // Clusters are next step to download. The only extra step is to extend the response by adding a parentId into array of objects.
-    const clustersTableName = getTableName(CLUSTERS_PREFIX, city);
-    const clustersDestination = `${bucketName}.${clustersTableName}`;
-    const clustersFileName = `${tableOutDir}/${clustersTableName}.csv`;
-    for (const entityId of entities) {
-      const next = `/v0.2/entity/${entityId}/clusters`;
-      const clusters = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-      const data = clusters.data.map(cluster => Object.assign({}, cluster, { parentId: clusters.entity }));
-      const result = await createOutputFile(clustersFileName, data);
-    }
-    const clustersManifest = await createManifestFile(`${clustersFileName}.manifest`, { destination: clustersDestination, incremental });
-    console.log(`Clusters data downloaded!`);
 
-    // Last part is about getting the peers for particular entity.
-    // We need to use multiple loops in order to iterate overs entities and multiple pages.
-    const peersTableName = getTableName(PEERS_PREFIX, city);
-    const peersDestination = `${bucketName}.${peersTableName}`;
-    const peersFileName = `${tableOutDir}/${peersDestination}.csv`;
-    for (const entityId of entities) {
-      const init = `/v0.2/entity/${entityId}/peers?page=1&limit=10`;
-      let hasMoreRecords = false;
-      do {
-        let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
-        const peersData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));
-        const result = size(peersData) > 0
-          ? await createOutputFile(peersFileName, peersData)
-          : null;
-        hasMoreRecords = stopAfterReachingPage && stopAfterReachingPage === page ? false : hasMore;
-      } while (hasMoreRecords);
+    if (includes(datasets, PEERS_PREFIX)) {
+      const result = await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage)
+      console.log(result);
     }
-    const peersManifest = await createManifestFile(`${peersFileName}.manifest`, { destination: peersDestination, incremental });
-    console.log(`Peers data downloaded!`);
-
+    console.log('All data downloaded!');
     process.exit(0);
   } catch (error) {
     console.log(error);

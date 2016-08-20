@@ -4,17 +4,18 @@ export const CONFIG_FILE = 'config.json';
 export const DEFAULT_DATA_DIR = '/data';
 export const DEFAULT_TABLES_IN_DIR = '/in/tables';
 export const DEFAULT_TABLES_OUT_DIR = '/out/tables';
-
+export const DEFAULT_DOWNLOAD_TYPE = false;
 
 /**
  * Prefixes for each tables
  */
+export const ENTITY_DETAILS_PREFIX = 'entityDetails';
 export const ENTITIES_PREFIX = 'entities';
 export const LOCATION_PREFIX = 'location';
+export const CLUSTERS_PREFIX = 'clusters';
 export const CONTACT_PREFIX = 'contact';
 export const PROFILE_PREFIX = 'profile';
 export const METRICS_PREFIX = 'metrics';
-export const CLUSTERS_PREFIX = 'clusters';
 export const PEERS_PREFIX = 'peers';
 
 /**

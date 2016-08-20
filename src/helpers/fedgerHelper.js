@@ -3,14 +3,26 @@ import csv from 'fast-csv';
 import isThere from 'is-there';
 import jsonfile from 'jsonfile';
 import limit from 'simple-rate-limiter';
-import { isInteger, toNumber, first, keys } from 'lodash';
 const request = limit(require("request")).to(40).per(60000);
+import {
+  size,
+  keys,
+  first,
+  toNumber,
+  isInteger
+} from 'lodash';
+import {
+  getTableName,
+  getKeboolaStorageMetadata,
+  createArrayOfKeboolaStorageMetadata
+} from './keboolaHelper';
 import {
   EVENT_END,
   EVENT_DATA,
   EVENT_ERROR,
   EVENT_FINISH,
-  EVENT_INVALID_DATA
+  EVENT_INVALID_DATA,
+  FEDGER_API_BASE_URL
 } from '../constants';
 
 /**
@@ -64,11 +76,12 @@ export function createOutputFile(fileName, data) {
 /**
  * This function creates an array of promises that leads to creating multiple files.
  */
-export function createMultipleFiles(inputMetadata, data) {
-  return keys(inputMetadata).map(key => {
+export function createMultipleFiles(metadata, data) {
+  return keys(metadata).map(key => {
     return new Promise(resolve => {
-      createOutputFile(inputMetadata[key].fileName, [ data[key] ]);
-      resolve(`${key} updated!`);
+      createOutputFile(metadata[key].fileName, [ data[key] ])
+        .then(result => resolve(`${key} updated!`))
+        .catch(error => reject(error));
     });
   });
 }
@@ -91,11 +104,11 @@ export function createManifestFile(fileName, data) {
 /**
  * This function creates an array of promises that leads to creating multiple manifest files.
  */
-export function createMultipleManifests(inputMetadata) {
-  return keys(inputMetadata).map(key => {
+export function createMultipleManifests(metadata) {
+  return keys(metadata).map(key => {
     return new Promise(resolve => {
-      const fileName = `${inputMetadata[key].fileName}.manifest`;
-      const { destination, incremental } = inputMetadata[key];
+      const fileName = `${metadata[key].fileName}.manifest`;
+      const { destination, incremental } = metadata[key];
       createManifestFile(fileName, { destination, incremental })
         .then(result => resolve(`${key} manifest created!`))
         .catch(error => reject(error));
@@ -108,10 +121,20 @@ export function createMultipleManifests(inputMetadata) {
  * After the file is downloaded/specified via input, we need to read the content.
  * This function helps to manage it and also validates, whether the input file is valid.
  */
-export function readEntityFileContent(file) {
+export function readEntityFileContent({
+  city,
+  prefix,
+  tableInDir,
+  tableOutDir,
+  inputFileName,
+  readEntitiesFromFile
+}) {
   return new Promise((resolve, reject) => {
-    const stream = fs.createReadStream(file);
     let result = [];
+    const fileName = readEntitiesFromFile
+      ? `${tableInDir}/${inputFileName}`
+      : `${tableOutDir}/${getTableName(prefix, city)}.csv`;
+    const stream = fs.createReadStream(fileName);
     csv
       .fromStream(stream, { headers: true })
       .transform(data => data.id)
@@ -132,4 +155,130 @@ export function convertArrayOfObjectsToObject(inputArray) {
     previous[key] = current[key];
     return previous;
   }, {});
+}
+
+
+/**
+ * This function simply download data for entities.
+ * The result is going to be stored in file and processed later.
+ */
+export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, apiKey, startPage, maximalPage) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        let hasMoreRecords = false;
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        const init = `/v0.2/entity/search?page=${startPage}&limit=10&city=${encodeURIComponent(city.toLowerCase())}`;
+        do {
+          let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+          const result = await createOutputFile(fileName, data);
+          hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
+        } while (hasMoreRecords);
+        // If data is successfully downloaded, we can create a manifest file.
+        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
+        resolve(`Data for '${city}' entity downloaded!`);
+      } catch(error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+
+/**
+ * This function takes care of downloading the expanded metadata for each individual entity.
+ */
+export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        // We need to prepare tablesName.
+        const metadata = convertArrayOfObjectsToObject(
+          createArrayOfKeboolaStorageMetadata(tableOutDir, bucketName, prefixes, city)
+        );
+        for (const entityId of entities) {
+          const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(prefixes.join(','))}`
+          const { location, contact, profile, metrics } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const result = await Promise.all(createMultipleFiles(metadata, { location, contact, profile, metrics }));
+        }
+        // Create manifest files as well.
+        const manifests = await Promise.all(createMultipleManifests(metadata));
+        resolve(`Expanded details for '${city}' downloaded!`);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function handles the download of cluster data.
+ * The HTTP response must be extended by parentId information.
+ */
+export function downloadClustersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const entityId of entities) {
+          const next = `/v0.2/entity/${entityId}/clusters`;
+          const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: entityId }));
+          const result = await createOutputFile(fileName, extendedData);
+        }
+        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
+        resolve(`Clusters data for '${city}' downloaded!`);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function handles the download of the peers data.
+ * The HTTP response must be extended by parentId information.
+ */
+export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const entityId of entities) {
+          let hasMoreRecords = false;
+          const init = `/v0.2/entity/${entityId}/peers?page=${startPage}&limit=10`;
+          do {
+            let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+            const extendedData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));
+            const result = size(extendedData) > 0
+              ? await createOutputFile(fileName, extendedData)
+              : null;
+            hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
+          } while (hasMoreRecords);
+        }
+        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
+        resolve(`Peers data for '${city}' downloaded!`);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
 }

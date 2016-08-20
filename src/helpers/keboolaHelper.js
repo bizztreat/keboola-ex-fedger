@@ -4,9 +4,11 @@ import {
   first,
   isArray,
   toLower,
+  isNumber,
   snakeCase,
   isUndefined
 } from 'lodash';
+import { DEFAULT_DOWNLOAD_TYPE } from '../constants';
 /**
  * This is a simple helper that checks whether the input configuration is valid.
  * If so, the particular object with relevant parameters is returned.
@@ -31,7 +33,7 @@ export function parseConfiguration(configObject) {
     if (readEntitiesFromFile && size(inputFiles) > 1) {
       reject('Too many input files selected! Please select exactly one file containing entity information!');
     }
-    const { destination: inputFileName } = first(inputFiles);
+    const { destination: inputFileName } = readEntitiesFromFile && first(inputFiles);
     const apiKey = configObject.get('parameters:#apiKey');
     if (isUndefined(apiKey)) {
       reject('Parameter #apiKey missing from input configuration! Please check out the documentation for more information!');
@@ -44,17 +46,32 @@ export function parseConfiguration(configObject) {
     if (isUndefined(city)) {
       reject('Parameter city missing from input configuration! Please check out the documentation for more information!');
     }
-    const stopAfterReachingPage = configObject.get('parameters:stopAfterReachingPage');
+    // These variables help with pagination.
+    const startPage = configObject.get('parameters:startPage') || 1;
+    const numberOfPages = configObject.get('parameters:numberOfPages');
+    const maximalPage = getMaximalPage(startPage, numberOfPages);
     resolve({
       city,
       apiKey,
       datasets,
+      startPage,
       bucketName,
+      maximalPage,
       inputFileName,
-      readEntitiesFromFile,
-      stopAfterReachingPage
+      readEntitiesFromFile
     })
   });
+}
+
+/**
+ * This function simply returns maximum page that can be reached.
+ */
+export function getMaximalPage(startPage, numberOfPages) {
+  return startPage
+    && numberOfPages
+    && isNumber(startPage)
+    && isNumber(numberOfPages)
+    && startPage + numberOfPages;
 }
 
 /**
@@ -63,4 +80,27 @@ export function parseConfiguration(configObject) {
  */
 export function getTableName(prefix, name) {
   return `${prefix}_${snakeCase(toLower(name))}`;
+}
+
+/**
+ * This function prepares object containing metadata required for writing
+ * output data into Keboola (output files & manifests).
+ */
+export function getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city) {
+  const incremental = DEFAULT_DOWNLOAD_TYPE;
+  const tableName = getTableName(prefix, city);
+  const destination = `${bucketName}.${tableName}`;
+  const fileName = `${tableOutDir}/${tableName}.csv`;
+  const manifestFileName = `${fileName}.manifest`;
+  return { tableName, fileName, incremental, destination, manifestFileName };
+}
+
+/**
+ * This function just create an array of metadata suitable for Keboola Connection.
+ */
+export function createArrayOfKeboolaStorageMetadata(tableOutDir, bucketName, prefixes, city) {
+  return prefixes.map(prefix => {
+    const storageMetadata = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+    return {[ prefix ]: storageMetadata};
+  });
 }
