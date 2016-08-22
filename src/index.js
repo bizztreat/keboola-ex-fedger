@@ -1,7 +1,7 @@
 'use strict';
 import path from 'path';
 import command from './helpers/cliHelper';
-import { size, includes } from 'lodash';
+import { size, includes, deburr } from 'lodash';
 import { getConfig } from './helpers/configHelper';
 import { parseConfiguration } from './helpers/keboolaHelper';
 import {

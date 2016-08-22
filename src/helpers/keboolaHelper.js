@@ -2,6 +2,7 @@
 import {
   size,
   first,
+  deburr,
   isArray,
   toLower,
   isNumber,
@@ -71,7 +72,7 @@ export function getMaximalPage(startPage, numberOfPages) {
     && numberOfPages
     && isNumber(startPage)
     && isNumber(numberOfPages)
-    && startPage + numberOfPages;
+    && startPage + numberOfPages - 1;
 }
 
 /**
@@ -88,7 +89,7 @@ export function getTableName(prefix, name) {
  */
 export function getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city) {
   const incremental = DEFAULT_DOWNLOAD_TYPE;
-  const tableName = getTableName(prefix, city);
+  const tableName = getTableName(prefix, deburr(city));
   const destination = `${bucketName}.${tableName}`;
   const fileName = `${tableOutDir}/${tableName}.csv`;
   const manifestFileName = `${fileName}.manifest`;

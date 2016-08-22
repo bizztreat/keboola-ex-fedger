@@ -7,6 +7,7 @@ const request = limit(require("request")).to(40).per(60000);
 import {
   size,
   keys,
+  last,
   first,
   toNumber,
   isInteger
@@ -40,7 +41,9 @@ function getQueryStringSymbol(uri) {
  * This function builds the url for downloads.
  */
 export function getUrl(baseUrl, init, uri = init, apiKey) {
-  return `${baseUrl}/${uri}${getQueryStringSymbol(uri)}apikey=${apiKey}`;
+  return uri.indexOf('city') > 0
+    ? `${baseUrl}${first(uri.split('city='))}city=${encodeURIComponent(last(uri.split('city=')))}&apikey=${apiKey}`
+    : `${baseUrl}/${uri}${getQueryStringSymbol(uri)}apikey=${apiKey}`;
 }
 
 /**
@@ -174,10 +177,12 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
           incremental,
           manifestFileName
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
-        const init = `/v0.2/entity/search?page=${startPage}&limit=10&city=${encodeURIComponent(city.toLowerCase())}`;
+        const init = `/v0.2/entity/search?page=${startPage}&limit=10&city=${city.toLowerCase()}`;
         do {
           let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
-          const result = await createOutputFile(fileName, data);
+          const result = size(data) > 0
+            ? await createOutputFile(fileName, data)
+            : null;
           hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
         } while (hasMoreRecords);
         // If data is successfully downloaded, we can create a manifest file.
@@ -236,7 +241,9 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
           const next = `/v0.2/entity/${entityId}/clusters`;
           const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: entityId }));
-          const result = await createOutputFile(fileName, extendedData);
+          const result = size(extendedData) > 0
+            ? await createOutputFile(fileName, extendedData)
+            : null;
         }
         const manifest = await createManifestFile(manifestFileName, { destination, incremental });
         resolve(`Clusters data for '${city}' downloaded!`);
