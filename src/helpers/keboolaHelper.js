@@ -105,3 +105,10 @@ export function createArrayOfKeboolaStorageMetadata(tableOutDir, bucketName, pre
     return {[ prefix ]: storageMetadata};
   });
 }
+
+/**
+ * This function simply removes non-printable characters.
+ */
+export function removeNonASCII(string){
+  return string ? string.replace(/[^\x20-\x7E]/g, '') : '';
+}

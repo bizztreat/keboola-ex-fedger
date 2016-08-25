@@ -9,11 +9,16 @@ import {
   keys,
   last,
   first,
+  replace,
   toNumber,
-  isInteger
+  toString,
+  isInteger,
+  cloneDeep,
+  escapeRegExp
 } from 'lodash';
 import {
   getTableName,
+  removeNonASCII,
   getKeboolaStorageMetadata,
   createArrayOfKeboolaStorageMetadata
 } from './keboolaHelper';
@@ -22,6 +27,7 @@ import {
   EVENT_DATA,
   EVENT_ERROR,
   EVENT_FINISH,
+  PROFILE_PREFIX,
   EVENT_INVALID_DATA,
   FEDGER_API_BASE_URL
 } from '../constants';
@@ -195,6 +201,42 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
   });
 }
 
+/**
+ * This function reads entities and create a file containing extra metadata for each entity.
+ * Extra set of metadata contains entity, type, description and tags.
+ */
+export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city, bucketName, apiKey) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const entityId of entities) {
+          const next = `/v0.2/entity/${entityId}?expand=${PROFILE_PREFIX}`;
+          const { type, description, tags } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const data = [{
+            entityId,
+            type,
+            tags: tags ? tags.join(',') : '',
+            description: removeNonASCII(description)
+          }];
+          const result = await createOutputFile(fileName, data);
+        }
+        // If data is successfully downloaded, we can create a manifest file.
+        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
+        resolve(`Extra entity metadata for '${city} downloaded!'`);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
 
 /**
  * This function takes care of downloading the expanded metadata for each individual entity.
@@ -209,8 +251,17 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
         );
         for (const entityId of entities) {
           const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(prefixes.join(','))}`
-          const { location, contact, profile, metrics } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-          const result = await Promise.all(createMultipleFiles(metadata, { location, contact, profile, metrics }));
+          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const { contact, profile, metrics, location } = data;
+          const services = Object.assign({}, data.services, {
+            onlineMenu: data.services.onlineMenu ? data.services.onlineMenu.join(',') : ''
+          });
+          const completeness = Object.assign({}, data.completeness, {
+            drillDown: JSON.stringify(data.completeness.drillDown)
+          });
+          const result = await Promise.all(createMultipleFiles(metadata,
+            { location, contact, profile, metrics, services, completeness }
+          ));
         }
         // Create manifest files as well.
         const manifests = await Promise.all(createMultipleManifests(metadata));

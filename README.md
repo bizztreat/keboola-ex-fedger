@@ -7,7 +7,7 @@ A Fedger.io extractor for Keboola Connection is a component extracting data from
 Not every endpoint supported by Fedger.io is currently implemented. Let's sum up the ones that are available in this extractor. **Only full downloads** are currently available.
 
 * GET /entity/search ([getEntitySearch](https://chef.fedger.io/v0.2/docs/#!/entity/get_entity_search)) - returns a list of all entities associated with search parameters.  
-* GET /entity/:id?expand='location,contact,profile,metrics' ([getEntity](https://chef.fedger.io/v0.2/docs/#!/entity/get_entity_id)) - returns a detail information about particular entity. Used with expand parameter that get more information about particular areas.
+* GET /entity/:id?expand='location,contact,profile,metrics,services,completeness' ([getEntity](https://chef.fedger.io/v0.2/docs/#!/entity/get_entity_id)) - returns a detail information about particular entity. Used with expand parameter that get more information about particular areas.
 * GET /entity/:id/clusters ([getEntityClusters](https://chef.fedger.io/v0.2/docs/#!/entity/get_entity_id_clusters)) - returns clusters information related to particular entity.
 * GET /entity/:id/peers ([getEntityPeers](https://chef.fedger.io/v0.2/docs/#!/entity/get_entity_id_peers)) - returns peers related to particular entity.
 
@@ -21,7 +21,7 @@ Configuration is very straightforward and deeply described below. There are quit
       "#apiKey": "some api key",
       "bucketName": "in.c-bucketName",
       "city": "berlin",
-      "datasets": ["entityDetails", "clusters", "peers"],
+      "datasets": ["entityMetadata","entityDetails", "clusters", "peers"],
       "readEntitiesFromFile": false,
       "startPage": 1,
       "numberOfPages": 50
@@ -33,7 +33,7 @@ One of the option for reducing the number of HTTP requests is to select the inpu
 
 ### Datasets specification
 
-Another option for keeping the number of requests sane is to specify the datasets for download. **This parameter is optional, but if not specified, just entities will be downloaded** (unless readEntitiesFromFile parameter is set to true, which will stop the execution). Valid values are **entityDetails**, **clusters** and **peers**. It's completely up to you have many of them you are going to use per configuration. The purpose of this attribute is really a possibility to split the number of requests into more configuration.
+Another option for keeping the number of requests sane is to specify the datasets for download. **This parameter is optional, but if not specified, just entities will be downloaded** (unless readEntitiesFromFile parameter is set to true, which will stop the execution). Valid values are **entityMetadata** **entityDetails**, **clusters** and **peers**. It's completely up to you have many of them you are going to use per configuration. The purpose of this attribute is really a possibility to split the number of requests into more configuration.
 
 ### Pagination
 

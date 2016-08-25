@@ -9,7 +9,11 @@ export const DEFAULT_DOWNLOAD_TYPE = false;
 /**
  * Prefixes for each tables
  */
+export const ENTITY_METADATA_FILE_PREFIX = 'type_tags_description';
+export const ENTITY_METADATA_PREFIX = 'entityMetadata';
 export const ENTITY_DETAILS_PREFIX = 'entityDetails';
+export const COMPLETENESS_PREFIX = 'completeness';
+export const SERVICES_PREFIX = 'services';
 export const ENTITIES_PREFIX = 'entities';
 export const LOCATION_PREFIX = 'location';
 export const CLUSTERS_PREFIX = 'clusters';

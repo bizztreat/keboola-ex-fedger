@@ -9,6 +9,7 @@ import {
   downloadDataForEntities,
   downloadPeersForEntities,
   downloadClustersForEntities,
+  downloadExtraEntityMetadata,
   downloadExpandedDataForEntities
 } from './helpers/fedgerHelper';
 import {
@@ -20,9 +21,13 @@ import {
   CLUSTERS_PREFIX,
   ENTITIES_PREFIX,
   LOCATION_PREFIX,
+  SERVICES_PREFIX,
+  COMPLETENESS_PREFIX,
   ENTITY_DETAILS_PREFIX,
   DEFAULT_TABLES_IN_DIR,
-  DEFAULT_TABLES_OUT_DIR
+  DEFAULT_TABLES_OUT_DIR,
+  ENTITY_METADATA_PREFIX,
+  ENTITY_METADATA_FILE_PREFIX
 } from './constants';
 /**
  * This is the main part of the program.
@@ -62,8 +67,13 @@ import {
     // or the one selected in the input configuration.
     const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city });
     // Following steps all depends on selected datasets.
+    if (includes(datasets, ENTITY_METADATA_PREFIX)) {
+      const result = await downloadExtraEntityMetadata(ENTITY_METADATA_FILE_PREFIX, entities, tableOutDir, city, bucketName, apiKey);
+      console.log(result);
+    }
+
     if (includes(datasets, ENTITY_DETAILS_PREFIX)) {
-      const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX ];
+      const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
       const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey);
       console.log(result);
     }
