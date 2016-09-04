@@ -41,6 +41,7 @@ import {
       datasets,
       startPage,
       bucketName,
+      apiVersion,
       incremental,
       maximalPage,
       inputFileName,
@@ -59,32 +60,32 @@ import {
     // If we do want to load the entities from the input, we can skip this step.
     if (!readEntitiesFromFile) {
       // Specification of the initial url.
-      const result = await downloadDataForEntities(ENTITIES_PREFIX, tableOutDir, city, bucketName, apiKey, startPage, maximalPage);
+      const result = await downloadDataForEntities(ENTITIES_PREFIX, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion);
       console.log(result);
     }
     // Next step is to load the content of the input (entities) file.
     // We are going to use the one downloaded from API recently
     // or the one selected in the input configuration.
-    const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city });
+    const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city, apiVersion });
     // Following steps all depends on selected datasets.
     if (includes(datasets, ENTITY_METADATA_PREFIX)) {
-      const result = await downloadExtraEntityMetadata(ENTITY_METADATA_FILE_PREFIX, entities, tableOutDir, city, bucketName, apiKey);
+      const result = await downloadExtraEntityMetadata(ENTITY_METADATA_FILE_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, ENTITY_DETAILS_PREFIX)) {
       const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
-      const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey);
+      const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, CLUSTERS_PREFIX)) {
-      const result = await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey);
+      const result = await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, PEERS_PREFIX)) {
-      const result = await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage)
+      const result = await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion)
       console.log(result);
     }
     console.log('All data downloaded!');

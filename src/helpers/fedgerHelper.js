@@ -3,12 +3,13 @@ import csv from 'fast-csv';
 import isThere from 'is-there';
 import jsonfile from 'jsonfile';
 import limit from 'simple-rate-limiter';
-const request = limit(require("request")).to(40).per(60000);
+const request = limit(require("request")).to(44).per(60000);
 import {
   size,
   keys,
   last,
   first,
+  isNull,
   replace,
   toNumber,
   toString,
@@ -27,6 +28,8 @@ import {
   EVENT_DATA,
   EVENT_ERROR,
   EVENT_FINISH,
+  API_VERSION_2,
+  API_VERSION_3,
   PROFILE_PREFIX,
   EVENT_INVALID_DATA,
   FEDGER_API_BASE_URL
@@ -115,12 +118,17 @@ export function createManifestFile(fileName, data) {
  */
 export function createMultipleManifests(metadata) {
   return keys(metadata).map(key => {
-    return new Promise(resolve => {
-      const fileName = `${metadata[key].fileName}.manifest`;
+    return new Promise((resolve, reject) => {
+      const fileName = `${metadata[key].fileName}`
+      const manifestFileName = `${fileName}.manifest`;
       const { destination, incremental } = metadata[key];
-      createManifestFile(fileName, { destination, incremental })
-        .then(result => resolve(`${key} manifest created!`))
-        .catch(error => reject(error));
+      if (isThere(fileName)) {
+        createManifestFile(manifestFileName, { destination, incremental })
+          .then(result => resolve(`${key} manifest created!`))
+          .catch(error => reject(error));
+      } else {
+        resolve(`${key} manifest skipped! ${fileName} is empty!`);
+      }
     });
   });
 }
@@ -133,6 +141,7 @@ export function createMultipleManifests(metadata) {
 export function readEntityFileContent({
   city,
   prefix,
+  apiVersion,
   tableInDir,
   tableOutDir,
   inputFileName,
@@ -147,7 +156,10 @@ export function readEntityFileContent({
     csv
       .fromStream(stream, { headers: true })
       .transform(data => data.id)
-      .validate(data => isInteger(toNumber(data)))
+      .validate(data => {
+        return apiVersion === API_VERSION_2 && isInteger(toNumber(data))
+          || apiVersion === API_VERSION_3 && data.length === 36
+      })
       .on(EVENT_INVALID_DATA, data => reject('Invalid input file!'))
       .on(EVENT_ERROR, error => reject(error))
       .on(EVENT_DATA, data => result.push(data))
@@ -171,7 +183,7 @@ export function convertArrayOfObjectsToObject(inputArray) {
  * This function simply download data for entities.
  * The result is going to be stored in file and processed later.
  */
-export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, apiKey, startPage, maximalPage) {
+export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -183,7 +195,7 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
           incremental,
           manifestFileName
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
-        const init = `/v0.2/entity/search?page=${startPage}&limit=10&city=${city.toLowerCase()}`;
+        const init = `/${apiVersion}/entity/search?page=${startPage}&limit=10&city=${city.toLowerCase()}`;
         do {
           let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
           const result = size(data) > 0
@@ -192,8 +204,13 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
           hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
         } while (hasMoreRecords);
         // If data is successfully downloaded, we can create a manifest file.
-        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
-        resolve(`Data for '${city}' entity downloaded!`);
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Data for '${city}' entity from API version ${apiVersion} downloaded!`
+          : `No data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
       } catch(error) {
         reject(error);
       }
@@ -205,7 +222,7 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
  * This function reads entities and create a file containing extra metadata for each entity.
  * Extra set of metadata contains entity, type, description and tags.
  */
-export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city, bucketName, apiKey) {
+export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -217,7 +234,7 @@ export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city,
           manifestFileName
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
-          const next = `/v0.2/entity/${entityId}?expand=${PROFILE_PREFIX}`;
+          const next = `/${apiVersion}/entity/${entityId}?expand=${PROFILE_PREFIX}`;
           const { type, description, tags } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const data = [{
             entityId,
@@ -228,8 +245,13 @@ export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city,
           const result = await createOutputFile(fileName, data);
         }
         // If data is successfully downloaded, we can create a manifest file.
-        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
-        resolve(`Extra entity metadata for '${city} downloaded!'`);
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Extra entity metadata for '${city}' from API version ${apiVersion} downloaded!`
+          : `No extra entity metadata for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
       } catch (error) {
         reject(error);
       }
@@ -241,7 +263,7 @@ export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city,
 /**
  * This function takes care of downloading the expanded metadata for each individual entity.
  */
-export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey) {
+export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -250,7 +272,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
           createArrayOfKeboolaStorageMetadata(tableOutDir, bucketName, prefixes, city)
         );
         for (const entityId of entities) {
-          const next = `/v0.2/entity/${entityId}?expand=${encodeURIComponent(prefixes.join(','))}`
+          const next = `/${apiVersion}/entity/${entityId}?expand=${encodeURIComponent(prefixes.join(','))}`
           const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const { contact, profile, metrics, location } = data;
           const services = Object.assign({}, data.services, {
@@ -265,7 +287,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
         }
         // Create manifest files as well.
         const manifests = await Promise.all(createMultipleManifests(metadata));
-        resolve(`Expanded details for '${city}' downloaded!`);
+        resolve(`Expanded details for '${city}' from API version ${apiVersion} downloaded!`);
       } catch (error) {
         reject(error);
       }
@@ -277,7 +299,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
  * This function handles the download of cluster data.
  * The HTTP response must be extended by parentId information.
  */
-export function downloadClustersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey) {
+export function downloadClustersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -289,15 +311,20 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
           manifestFileName
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
-          const next = `/v0.2/entity/${entityId}/clusters`;
+          const next = `/${apiVersion}/entity/${entityId}/clusters`;
           const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: entityId }));
           const result = size(extendedData) > 0
             ? await createOutputFile(fileName, extendedData)
             : null;
         }
-        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
-        resolve(`Clusters data for '${city}' downloaded!`);
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Clusters data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No clusters data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
       } catch (error) {
         reject(error);
       }
@@ -309,7 +336,7 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
  * This function handles the download of the peers data.
  * The HTTP response must be extended by parentId information.
  */
-export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage) {
+export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -322,7 +349,7 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
           let hasMoreRecords = false;
-          const init = `/v0.2/entity/${entityId}/peers?page=${startPage}&limit=10`;
+          const init = `/${apiVersion}/entity/${entityId}/peers?page=${startPage}&limit=10`;
           do {
             let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
             const extendedData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));
@@ -332,8 +359,13 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
             hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
           } while (hasMoreRecords);
         }
-        const manifest = await createManifestFile(manifestFileName, { destination, incremental });
-        resolve(`Peers data for '${city}' downloaded!`);
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Peers data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No peers data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
       } catch (error) {
         reject(error);
       }

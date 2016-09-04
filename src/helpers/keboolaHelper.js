@@ -6,10 +6,15 @@ import {
   isArray,
   toLower,
   isNumber,
+  includes,
   snakeCase,
   isUndefined
 } from 'lodash';
-import { DEFAULT_DOWNLOAD_TYPE } from '../constants';
+import {
+  DEFAULT_API_VERSION,
+  DEFAULT_DOWNLOAD_TYPE,
+  SUPPORTED_API_VERSIONS
+} from '../constants';
 /**
  * This is a simple helper that checks whether the input configuration is valid.
  * If so, the particular object with relevant parameters is returned.
@@ -24,6 +29,12 @@ export function parseConfiguration(configObject) {
     const datasets = configObject.get('parameters:datasets');
     if (!isUndefined(datasets) && !isArray(datasets)) {
       reject('Please specify the datasets parameter as an array! Check out the documentation for more details!');
+    }
+    // We also need to read the desired version of the API.
+    const apiVersion = configObject.get('parameters:apiVersion') || DEFAULT_API_VERSION;
+    // We only need to work with v0.2 or v0.3 version of the API.
+    if (!includes(SUPPORTED_API_VERSIONS, apiVersion)) {
+      reject(`Invalid apiVersion parameter! Only ${SUPPORTED_API_VERSIONS} supported!`);
     }
     // Check whether the user wishes to read entities from an input file (default false)
     const readEntitiesFromFile = configObject.get('parameters:readEntitiesFromFile') || false;
@@ -57,6 +68,7 @@ export function parseConfiguration(configObject) {
       datasets,
       startPage,
       bucketName,
+      apiVersion,
       maximalPage,
       inputFileName,
       readEntitiesFromFile
