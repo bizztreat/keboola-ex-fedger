@@ -16,6 +16,7 @@ export const SUPPORTED_API_VERSIONS = [ API_VERSION_2, API_VERSION_3 ];
  */
 export const ENTITY_METADATA_FILE_PREFIX = 'type_tags_description';
 export const ENTITY_METADATA_PREFIX = 'entityMetadata';
+export const REVIEWS_DETAILS_PREFIX = 'reviewsDetails';
 export const ENTITY_DETAILS_PREFIX = 'entityDetails';
 export const COMPLETENESS_PREFIX = 'completeness';
 export const SERVICES_PREFIX = 'services';
@@ -25,7 +26,9 @@ export const CLUSTERS_PREFIX = 'clusters';
 export const CONTACT_PREFIX = 'contact';
 export const PROFILE_PREFIX = 'profile';
 export const METRICS_PREFIX = 'metrics';
+export const REVIEWS_PREFIX = 'reviews';
 export const PEERS_PREFIX = 'peers';
+
 
 /**
  * Events constants

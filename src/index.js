@@ -6,8 +6,11 @@ import { getConfig } from './helpers/configHelper';
 import { parseConfiguration } from './helpers/keboolaHelper';
 import {
   readEntityFileContent,
+  readReviewFileContent,
   downloadDataForEntities,
   downloadPeersForEntities,
+  downloadDetailsOfReviews,
+  downloadReviewsOfEntities,
   downloadClustersForEntities,
   downloadExtraEntityMetadata,
   downloadExpandedDataForEntities
@@ -15,9 +18,12 @@ import {
 import {
   CONFIG_FILE,
   PEERS_PREFIX,
+  API_VERSION_2,
+  API_VERSION_3,
   CONTACT_PREFIX,
   PROFILE_PREFIX,
   METRICS_PREFIX,
+  REVIEWS_PREFIX,
   CLUSTERS_PREFIX,
   ENTITIES_PREFIX,
   LOCATION_PREFIX,
@@ -26,6 +32,8 @@ import {
   ENTITY_DETAILS_PREFIX,
   DEFAULT_TABLES_IN_DIR,
   DEFAULT_TABLES_OUT_DIR,
+  REVIEWS_DETAILS_PREFIX,
+  SUPPORTED_API_VERSIONS,
   ENTITY_METADATA_PREFIX,
   ENTITY_METADATA_FILE_PREFIX
 } from './constants';
@@ -68,26 +76,39 @@ import {
     // or the one selected in the input configuration.
     const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city, apiVersion });
     // Following steps all depends on selected datasets.
-    if (includes(datasets, ENTITY_METADATA_PREFIX)) {
+    if (includes(datasets, ENTITY_METADATA_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
       const result = await downloadExtraEntityMetadata(ENTITY_METADATA_FILE_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
-    if (includes(datasets, ENTITY_DETAILS_PREFIX)) {
+    if (includes(datasets, ENTITY_DETAILS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
       const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
       const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
-    if (includes(datasets, CLUSTERS_PREFIX)) {
+    if (includes(datasets, CLUSTERS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
       const result = await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
-    if (includes(datasets, PEERS_PREFIX)) {
+    if (includes(datasets, PEERS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
       const result = await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion)
       console.log(result);
     }
+
+    if (includes(datasets, REVIEWS_PREFIX) && apiVersion === API_VERSION_3) {
+      const result = await downloadReviewsOfEntities(REVIEWS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
+      console.log(result);
+    }
+
+    if (includes(datasets, REVIEWS_PREFIX) && includes(datasets, REVIEWS_DETAILS_PREFIX) && apiVersion === API_VERSION_3) {
+      // First of all we need to read the content of the reviews file.
+      const reviews = await readReviewFileContent({ prefix: REVIEWS_PREFIX, tableOutDir, city, apiVersion });
+      const result = await downloadDetailsOfReviews(REVIEWS_DETAILS_PREFIX, reviews, tableOutDir, city, bucketName, apiKey, apiVersion);
+      console.log(result);
+    }
+
     console.log('All data downloaded!');
     process.exit(0);
   } catch (error) {

@@ -148,7 +148,7 @@ export function readEntityFileContent({
   readEntitiesFromFile
 }) {
   return new Promise((resolve, reject) => {
-    let result = [];
+    const result = [];
     const fileName = readEntitiesFromFile
       ? `${tableInDir}/${inputFileName}`
       : `${tableOutDir}/${getTableName(prefix, city)}.csv`;
@@ -161,6 +161,30 @@ export function readEntityFileContent({
           || apiVersion === API_VERSION_3 && data.length === 36
       })
       .on(EVENT_INVALID_DATA, data => reject('Invalid input file!'))
+      .on(EVENT_ERROR, error => reject(error))
+      .on(EVENT_DATA, data => result.push(data))
+      .on(EVENT_END, () => resolve(result));
+  });
+}
+
+/**
+ * This function is going to read the content of the actual reviews file.
+ * Function is invoked only in the situation when user requests to
+ * download reviews details data.
+ */
+export function readReviewFileContent({
+  city,
+  prefix,
+  apiVersion,
+  tableOutDir
+}) {
+  return new Promise((resolve, reject) => {
+    const result = [];
+    const fileName = `${tableOutDir}/${getTableName(prefix, city)}.csv`;
+    const stream = fs.createReadStream(fileName);
+    csv
+      .fromStream(stream, { headers: true })
+      .transform(data => data.id)
       .on(EVENT_ERROR, error => reject(error))
       .on(EVENT_DATA, data => result.push(data))
       .on(EVENT_END, () => resolve(result));
@@ -365,6 +389,77 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
         const outputMessage = !isNull(manifest)
           ? `Peers data for '${city}' from API version ${apiVersion} downloaded!`
           : `No peers data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function handles the download of the reviews data.
+ * There seems to be no pagination. Each entity has the exact amount of records.
+ */
+export function downloadReviewsOfEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const entityId of entities) {
+          const next = `/${apiVersion}/entity/${entityId}/reviews`;
+          const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const extendedData = data.map(review => Object.assign({}, review, { parentId: entityId }));
+          const result = size(extendedData) > 0
+            ? await createOutputFile(fileName, extendedData)
+            : null;
+        }
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Reviews data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No reviews data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function reads a list of reviews and for each item gets more details.
+ */
+export function downloadDetailsOfReviews(prefix, reviews, tableOutDir, city, bucketName, apiKey, apiVersion) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const reviewId of reviews) {
+          const next = `/${apiVersion}/review/${reviewId}`;
+          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const result = await createOutputFile(fileName, [ data ]);
+        }
+        // If data is successfully downloaded, we can create a manifest file.
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Reviews details data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No reviews details data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
         resolve(outputMessage);
       } catch (error) {
         reject(error);
