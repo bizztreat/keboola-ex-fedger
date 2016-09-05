@@ -11,6 +11,7 @@ import {
   isUndefined
 } from 'lodash';
 import {
+  API_VERSION_2,
   DEFAULT_API_VERSION,
   DEFAULT_DOWNLOAD_TYPE,
   SUPPORTED_API_VERSIONS
@@ -123,4 +124,36 @@ export function createArrayOfKeboolaStorageMetadata(tableOutDir, bucketName, pre
  */
 export function removeNonASCII(string){
   return string ? string.replace(/[^\x20-\x7E]/g, '') : '';
+}
+
+/**
+ * This function sanitize location results from API v0.3 to make sure the number of columns is consistent.
+ */
+export function sanitizeLocation(location, apiVersion) {
+  return apiVersion !== API_VERSION_2
+    ? {
+      entity: location.entity || '',
+      object: location.object || '',
+      postalCode: location.postalCode || '',
+      streetName: location.streetName || '',
+      countryCode: location.countryCode || '',
+      city: location.city || '',
+      latitude: location.latitude || '',
+      streetNumber: location.streetNumber || '',
+      longitude: location.longitude || ''
+    } : location;
+}
+
+/**
+ * This function sanitize contact results from API v0.3 to make sure the number of columns is consistent.
+ */
+export function sanitizeContact(contact, apiVersion) {
+  return apiVersion !== API_VERSION_2
+    ? {
+      entity: contact.entity || '',
+      object: contact.object || '',
+      url: contact.url || '',
+      telephone: contact.telephone || '',
+      email: contact.email || ''
+    } : contact;
 }

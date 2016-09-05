@@ -20,6 +20,8 @@ import {
 import {
   getTableName,
   removeNonASCII,
+  sanitizeContact,
+  sanitizeLocation,
   getKeboolaStorageMetadata,
   createArrayOfKeboolaStorageMetadata
 } from './keboolaHelper';
@@ -306,7 +308,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
             drillDown: JSON.stringify(data.completeness.drillDown)
           });
           const result = await Promise.all(createMultipleFiles(metadata,
-            { location, contact, profile, metrics, services, completeness }
+            { location: sanitizeLocation(location, apiVersion), contact: sanitizeContact(contact, apiVersion), profile, metrics, services, completeness }
           ));
         }
         // Create manifest files as well.
