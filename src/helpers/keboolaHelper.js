@@ -157,3 +157,21 @@ export function sanitizeContact(contact, apiVersion) {
       email: contact.email || ''
     } : contact;
 }
+
+/**
+ * This function sanitize reviewDetails results from API v0.3 to make sure the number of columns is consistent.
+ */
+ export function sanitizeReviewDetails(reviewsDetails) {
+   return {
+     object: reviewsDetails.object || '',
+     expand: reviewsDetails.expand || '',
+     id: reviewsDetails.id || '',
+     reviewRating: reviewsDetails.reviewRating || '',
+     source: reviewsDetails.source || '',
+     body: reviewsDetails.body || '',
+     author: reviewsDetails.author || '',
+     datePublished: reviewsDetails.datePublished || '',
+     entity: reviewsDetails.entity || '',
+     itemReviewed: reviewsDetails.itemReviewed || ''
+   }
+ }

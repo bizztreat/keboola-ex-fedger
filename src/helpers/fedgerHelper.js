@@ -22,6 +22,7 @@ import {
   removeNonASCII,
   sanitizeContact,
   sanitizeLocation,
+  sanitizeReviewDetails,
   getKeboolaStorageMetadata,
   createArrayOfKeboolaStorageMetadata
 } from './keboolaHelper';
@@ -453,7 +454,7 @@ export function downloadDetailsOfReviews(prefix, reviews, tableOutDir, city, buc
         for (const reviewId of reviews) {
           const next = `/${apiVersion}/review/${reviewId}`;
           const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-          const result = await createOutputFile(fileName, [ data ]);
+          const result = await createOutputFile(fileName, [ sanitizeReviewDetails(data) ]);
         }
         // If data is successfully downloaded, we can create a manifest file.
         const manifest = isThere(fileName)
