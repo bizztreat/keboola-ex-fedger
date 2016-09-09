@@ -14,6 +14,7 @@ import {
   API_VERSION_2,
   DEFAULT_API_VERSION,
   DEFAULT_DOWNLOAD_TYPE,
+  SUPPORTED_FILE_INPUTS,
   SUPPORTED_API_VERSIONS
 } from '../constants';
 /**
@@ -35,18 +36,21 @@ export function parseConfiguration(configObject) {
     const apiVersion = configObject.get('parameters:apiVersion') || DEFAULT_API_VERSION;
     // We only need to work with v0.2 or v0.3 version of the API.
     if (!includes(SUPPORTED_API_VERSIONS, apiVersion)) {
-      reject(`Invalid apiVersion parameter! Only ${SUPPORTED_API_VERSIONS} supported!`);
+      reject(`Invalid apiVersion parameter! Only following values: ${SUPPORTED_API_VERSIONS} supported!`);
     }
-    // Check whether the user wishes to read entities from an input file (default false)
-    const readEntitiesFromFile = configObject.get('parameters:readEntitiesFromFile') || false;
+    // Check whether the user wishes to read entities from an input file
+    const inputFileType = configObject.get('parameters:inputFileType');
+    if (inputFileType && !includes(SUPPORTED_FILE_INPUTS, inputFileType)) {
+      reject(`Invalid inputFile parameter! Only following values: ${SUPPORTED_FILE_INPUTS} supported!`);
+    }
     // If a user wants to load entities from a file, an input file must be selected.
-    if (readEntitiesFromFile && size(inputFiles) === 0) {
-      reject('Parameter readEntitiesFromFile set to true, but no input file specified!');
+    if (inputFileType && size(inputFiles) === 0) {
+      reject('Parameter inputFileType set, but no input file specified!');
     }
-    if (readEntitiesFromFile && size(inputFiles) > 1) {
-      reject('Too many input files selected! Please select exactly one file containing entity information!');
+    if (inputFileType && size(inputFiles) > 1) {
+      reject(`Too many input files selected! Please select exactly one file containing ${inputFileType} information!`);
     }
-    const { destination: inputFileName } = readEntitiesFromFile && first(inputFiles);
+    const inputFileName = inputFileType && first(inputFiles).destination;
     const apiKey = configObject.get('parameters:#apiKey');
     if (isUndefined(apiKey)) {
       reject('Parameter #apiKey missing from input configuration! Please check out the documentation for more information!');
@@ -72,7 +76,7 @@ export function parseConfiguration(configObject) {
       apiVersion,
       maximalPage,
       inputFileName,
-      readEntitiesFromFile
+      inputFileType
     })
   });
 }
@@ -154,7 +158,8 @@ export function sanitizeContact(contact, apiVersion) {
       object: contact.object || '',
       url: contact.url || '',
       telephone: contact.telephone || '',
-      email: contact.email || ''
+      email: contact.email || '',
+      faxNumber: contact.faxNumber || ''
     } : contact;
 }
 

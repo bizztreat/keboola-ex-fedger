@@ -1,16 +1,17 @@
 'use strict';
 import path from 'path';
 import command from './helpers/cliHelper';
-import { size, includes, deburr } from 'lodash';
 import { getConfig } from './helpers/configHelper';
 import { parseConfiguration } from './helpers/keboolaHelper';
+import { size, includes, deburr, isUndefined } from 'lodash';
 import {
-  readEntityFileContent,
-  readReviewFileContent,
+  readFileContent,
   downloadDataForEntities,
   downloadPeersForEntities,
   downloadDetailsOfReviews,
   downloadReviewsOfEntities,
+  downloadClusterMetricsById,
+  downloadClusterMembersById,
   downloadClustersForEntities,
   downloadExtraEntityMetadata,
   downloadExpandedDataForEntities
@@ -31,6 +32,8 @@ import {
   COMPLETENESS_PREFIX,
   ENTITY_DETAILS_PREFIX,
   DEFAULT_TABLES_IN_DIR,
+  CLUSTER_METRICS_PREFIX,
+  CLUSTER_MEMBERS_PREFIX,
   DEFAULT_TABLES_OUT_DIR,
   REVIEWS_DETAILS_PREFIX,
   SUPPORTED_API_VERSIONS,
@@ -53,58 +56,72 @@ import {
       incremental,
       maximalPage,
       inputFileName,
-      readEntitiesFromFile
+      inputFileType
     } = await parseConfiguration(getConfig(path.join(command.data, CONFIG_FILE)));
     // Prepare table directories.
     const tableInDir = path.join(command.data, DEFAULT_TABLES_IN_DIR);
     const tableOutDir = path.join(command.data, DEFAULT_TABLES_OUT_DIR);
-    // First of all, we need to check whether running of this component does make a sense.
-    // If user select reading of the entity source data from the file, but the datasets array is empty,
-    // we don't need to run the component, as no new data are going to be downloaded.
-    if (readEntitiesFromFile && size(datasets) === 0) {
-      console.log('Nothing to download! Please make sure the datasets array in the configuration contains some data and/or the readEntitiesFromFile attribute is set to false!');
-      process.exit(0);
-    }
-    // If we do want to load the entities from the input, we can skip this step.
-    if (!readEntitiesFromFile) {
-      // Specification of the initial url.
-      const result = await downloadDataForEntities(ENTITIES_PREFIX, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion);
+
+    if (includes(datasets, ENTITIES_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
+      const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== ENTITIES_PREFIX))
+        ? await downloadDataForEntities(ENTITIES_PREFIX, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion)
+        : `Dataset ${ENTITIES_PREFIX} are going to be read from the input file!`;
       console.log(result);
     }
-    // Next step is to load the content of the input (entities) file.
-    // We are going to use the one downloaded from API recently
-    // or the one selected in the input configuration.
-    const entities = await readEntityFileContent({ prefix: ENTITIES_PREFIX, readEntitiesFromFile, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+
     // Following steps all depends on selected datasets.
     if (includes(datasets, ENTITY_METADATA_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
+      const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
       const result = await downloadExtraEntityMetadata(ENTITY_METADATA_FILE_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, ENTITY_DETAILS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
+      const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
       const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
       const result = await downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, CLUSTERS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
-      const result = await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
+      const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+      const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== CLUSTERS_PREFIX))
+        ? await downloadClustersForEntities(CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion)
+        : `Dataset ${CLUSTERS_PREFIX} are going to be read from the input file!`;
+      console.log(result);
+    }
+
+    if (((inputFileType && inputFileType === CLUSTERS_PREFIX && includes(datasets, CLUSTER_METRICS_PREFIX)) || (includes(datasets, CLUSTERS_PREFIX) && includes(datasets, CLUSTER_METRICS_PREFIX))) && apiVersion === API_VERSION_3) {
+      const clusters = await readFileContent({ prefix: CLUSTERS_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+      const result = await downloadClusterMetricsById(CLUSTER_METRICS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, apiVersion);
+      console.log(result);
+    }
+
+    if (((inputFileType && inputFileType === CLUSTERS_PREFIX && includes(datasets, CLUSTER_MEMBERS_PREFIX)) || (includes(datasets, CLUSTERS_PREFIX) && includes(datasets, CLUSTER_MEMBERS_PREFIX))) && apiVersion === API_VERSION_3) {
+      const clusters = await readFileContent({ prefix: CLUSTERS_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+      const result = await downloadClusterMembersById(CLUSTER_MEMBERS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion);
       console.log(result);
     }
 
     if (includes(datasets, PEERS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
-      const result = await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion)
+      const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+      const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== PEERS_PREFIX))
+        ? await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion)
+        : `Dataset ${PEERS_PREFIX} are going to be read from the input file!`;
       console.log(result);
     }
 
     if (includes(datasets, REVIEWS_PREFIX) && apiVersion === API_VERSION_3) {
-      const result = await downloadReviewsOfEntities(REVIEWS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion);
+      const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+      const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== REVIEWS_PREFIX))
+        ? await downloadReviewsOfEntities(REVIEWS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion)
+        : `Dataset ${REVIEWS_PREFIX} are going to be read from the input file!`;
       console.log(result);
     }
 
-    if (includes(datasets, REVIEWS_PREFIX) && includes(datasets, REVIEWS_DETAILS_PREFIX) && apiVersion === API_VERSION_3) {
+    if ((inputFileType && inputFileType === REVIEWS_PREFIX) || (includes(datasets, REVIEWS_PREFIX) && includes(datasets, REVIEWS_DETAILS_PREFIX)) && apiVersion === API_VERSION_3) {
       // First of all we need to read the content of the reviews file.
-      const reviews = await readReviewFileContent({ prefix: REVIEWS_PREFIX, tableOutDir, city, apiVersion });
+      const reviews = await readFileContent({ prefix: REVIEWS_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
       const result = await downloadDetailsOfReviews(REVIEWS_DETAILS_PREFIX, reviews, tableOutDir, city, bucketName, apiKey, apiVersion);
       console.log(result);
     }

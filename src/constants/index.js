@@ -17,6 +17,8 @@ export const SUPPORTED_API_VERSIONS = [ API_VERSION_2, API_VERSION_3 ];
 export const ENTITY_METADATA_FILE_PREFIX = 'type_tags_description';
 export const ENTITY_METADATA_PREFIX = 'entityMetadata';
 export const REVIEWS_DETAILS_PREFIX = 'reviewsDetails';
+export const CLUSTER_METRICS_PREFIX = 'clusterMetrics';
+export const CLUSTER_MEMBERS_PREFIX = 'clusterMembers';
 export const ENTITY_DETAILS_PREFIX = 'entityDetails';
 export const COMPLETENESS_PREFIX = 'completeness';
 export const SERVICES_PREFIX = 'services';
@@ -28,6 +30,12 @@ export const PROFILE_PREFIX = 'profile';
 export const METRICS_PREFIX = 'metrics';
 export const REVIEWS_PREFIX = 'reviews';
 export const PEERS_PREFIX = 'peers';
+export const SUPPORTED_FILE_INPUTS = [
+  PEERS_PREFIX,
+  ENTITIES_PREFIX,
+  CLUSTERS_PREFIX,
+  REVIEWS_PREFIX
+];
 
 
 /**

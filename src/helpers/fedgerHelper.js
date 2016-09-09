@@ -8,9 +8,12 @@ import {
   size,
   keys,
   last,
+  uniq,
   first,
   isNull,
+  uniqBy,
   replace,
+  includes,
   toNumber,
   toString,
   isInteger,
@@ -34,6 +37,7 @@ import {
   API_VERSION_2,
   API_VERSION_3,
   PROFILE_PREFIX,
+  ENTITIES_PREFIX,
   EVENT_INVALID_DATA,
   FEDGER_API_BASE_URL
 } from '../constants';
@@ -137,60 +141,44 @@ export function createMultipleManifests(metadata) {
 }
 
 /**
+ * This function validates the ids from file input.
+ * Can distinguish between API versions v0.2 and v0.3.
+ */
+export function validateInputStream(prefix, apiVersion, data) {
+  return apiVersion === API_VERSION_2 && isInteger(toNumber(data.id))
+    || apiVersion === API_VERSION_3 && data.id.length === 36;
+}
+
+/**
  * Application works with the entities data.
  * After the file is downloaded/specified via input, we need to read the content.
  * This function helps to manage it and also validates, whether the input file is valid.
  */
-export function readEntityFileContent({
+export function readFileContent({
   city,
   prefix,
   apiVersion,
   tableInDir,
   tableOutDir,
   inputFileName,
-  readEntitiesFromFile
+  inputFileType
 }) {
   return new Promise((resolve, reject) => {
     const result = [];
-    const fileName = readEntitiesFromFile
+    const fileName = inputFileType && inputFileType === prefix
       ? `${tableInDir}/${inputFileName}`
       : `${tableOutDir}/${getTableName(prefix, city)}.csv`;
+    if (!isThere(fileName)) {
+      reject(`Missing data for ${prefix}! Please verify your configuration!`);
+    }
     const stream = fs.createReadStream(fileName);
     csv
       .fromStream(stream, { headers: true })
-      .transform(data => data.id)
-      .validate(data => {
-        return apiVersion === API_VERSION_2 && isInteger(toNumber(data))
-          || apiVersion === API_VERSION_3 && data.length === 36
-      })
+      .validate(data => validateInputStream(prefix, apiVersion, data))
       .on(EVENT_INVALID_DATA, data => reject('Invalid input file!'))
       .on(EVENT_ERROR, error => reject(error))
-      .on(EVENT_DATA, data => result.push(data))
-      .on(EVENT_END, () => resolve(result));
-  });
-}
-
-/**
- * This function is going to read the content of the actual reviews file.
- * Function is invoked only in the situation when user requests to
- * download reviews details data.
- */
-export function readReviewFileContent({
-  city,
-  prefix,
-  apiVersion,
-  tableOutDir
-}) {
-  return new Promise((resolve, reject) => {
-    const result = [];
-    const fileName = `${tableOutDir}/${getTableName(prefix, city)}.csv`;
-    const stream = fs.createReadStream(fileName);
-    csv
-      .fromStream(stream, { headers: true })
-      .transform(data => data.id)
-      .on(EVENT_ERROR, error => reject(error))
-      .on(EVENT_DATA, data => result.push(data))
-      .on(EVENT_END, () => resolve(result));
+      .on(EVENT_DATA, data => result.push(data.id))
+      .on(EVENT_END, () => resolve(uniq(result)));
   });
 }
 
@@ -340,7 +328,7 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
         for (const entityId of entities) {
           const next = `/${apiVersion}/entity/${entityId}/clusters`;
           const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
-          const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: entityId }));
+          const extendedData = uniqBy(data, 'id').map(cluster => Object.assign({}, cluster, { parentId: entityId }));
           const result = size(extendedData) > 0
             ? await createOutputFile(fileName, extendedData)
             : null;
@@ -351,6 +339,79 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
         const outputMessage = !isNull(manifest)
           ? `Clusters data for '${city}' from API version ${apiVersion} downloaded!`
           : `No clusters data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function handles the download of cluster metrics by id.
+ */
+export function downloadClusterMetricsById(prefix, clusters, tableOutDir, city, bucketName, apiKey, apiVersion) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const clusterId of clusters) {
+          const next = `/${apiVersion}/cluster/${clusterId}/metrics`;
+          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const result = await createOutputFile(fileName, [ data ]);
+        }
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Cluster metrics data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No cluster metrics data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
+      } catch(error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
+/**
+ * This function handles the download of cluster members by id.
+ */
+export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const clusterId of clusters) {
+          let hasMoreRecords = false;
+          const init = `/${apiVersion}/cluster/${clusterId}/members?page=${startPage}&limit=10`;
+          do {
+            let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+            const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: clusterId }));
+            const result = size(extendedData) > 0
+              ? await createOutputFile(fileName, extendedData)
+              : null;
+            hasMoreRecords = maximalPage && maximalPage === page ? false : hasMore;
+          } while (hasMoreRecords);
+        }
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Cluster members data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No cluster members data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
         resolve(outputMessage);
       } catch (error) {
         reject(error);
