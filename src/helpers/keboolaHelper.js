@@ -11,11 +11,13 @@ import {
   isUndefined
 } from 'lodash';
 import {
+  PAGE_SIZE,
   API_VERSION_2,
   DEFAULT_API_VERSION,
   DEFAULT_DOWNLOAD_TYPE,
   SUPPORTED_FILE_INPUTS,
-  SUPPORTED_API_VERSIONS
+  SUPPORTED_API_VERSIONS,
+  NUMBER_OF_REQUESTS_PER_MINUTE
 } from '../constants';
 /**
  * This is a simple helper that checks whether the input configuration is valid.
@@ -66,17 +68,21 @@ export function parseConfiguration(configObject) {
     // These variables help with pagination.
     const startPage = configObject.get('parameters:startPage') || 1;
     const numberOfPages = configObject.get('parameters:numberOfPages');
+    const pageSize = configObject.get('parameters:pageSize') || PAGE_SIZE;
+    const numberOfRequestsPerMinute = configObject.get('parameters:numberOfRequestsPerMinute') || NUMBER_OF_REQUESTS_PER_MINUTE;
     const maximalPage = getMaximalPage(startPage, numberOfPages);
     resolve({
       city,
       apiKey,
+      pageSize,
       datasets,
       startPage,
       bucketName,
       apiVersion,
       maximalPage,
       inputFileName,
-      inputFileType
+      inputFileType,
+      numberOfRequestsPerMinute
     })
   });
 }

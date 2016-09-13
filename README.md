@@ -38,7 +38,9 @@ Configuration is very straightforward and deeply described below. There are quit
       "datasets": ["entities", "entityMetadata", "entityDetails", "clusters", "clusterMetrics", "clusterMembers", "peers", "reviews", "reviewsDetails"],
       "inputFileType": "entities"
       "startPage": 1,
-      "numberOfPages": 50
+      "numberOfPages": 5,
+      "pageSize": 50,
+      "numberOfRequestsPerMinute": 44
     }
 
 ### Selecting an input file
@@ -63,7 +65,12 @@ It's completely up to you have many of them you are going to use per configurati
 
 ### Pagination
 
-Some endpoints (getEntitySearch, getEntityPeers and getClusterMembers) contain quite a few records. On the backend side, a pagination is in place and the download process is able to handle it. The very big limitation of the Fedger.io API is maximal page size of 10 records. This limitation obviously leads into a need to make a lot of requests. There are two optional attributes, **startPage** and **numberOfPages** that helps to manage it. If you decide to not use it, the extractor assumes you want to download everything.
+Some endpoints (getEntitySearch, getEntityPeers and getClusterMembers) contain quite a few records. On the backend side, a pagination is in place and the download process is able to handle it. The very big limitation of the Fedger.io API is maximal page size of 10 records. This limitation obviously leads into a need to make a lot of requests. There are two optional attributes, **startPage** and **numberOfPages** that helps to manage it. If you decide to not use it, the extractor assumes you want to download everything. Don't forget to specify parameter **pageSize** unless you are happy with its default value of **10**. 
+
+### Requests per minute
+
+You can also specify parameter **numberOfRequestsPerMinute**. This tells fedger.io how many requests per minutes you want to make. The limit allowed by Fedger.io is usually very low and for that reason this value must be discussed with people from Fedger.io.
+
 
 ### City
 
