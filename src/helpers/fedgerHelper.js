@@ -385,7 +385,7 @@ export function downloadClusterMetricsById(prefix, clusters, tableOutDir, city, 
 /**
  * This function handles the download of cluster members by id.
  */
-export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize) {
+export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -398,7 +398,7 @@ export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, 
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const clusterId of clusters) {
           let hasMoreRecords = false;
-          const init = `/${apiVersion}/cluster/${clusterId}/members?page=${startPage}&limit=${pageSize}`;
+          const init = `/${apiVersion}/cluster/${clusterId}/members?page=1&limit=${pageSize}`;
           do {
             let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
             const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: clusterId }));
@@ -426,7 +426,7 @@ export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, 
  * This function handles the download of the peers data.
  * The HTTP response must be extended by parentId information.
  */
-export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize) {
+export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -439,7 +439,7 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
           let hasMoreRecords = false;
-          const init = `/${apiVersion}/entity/${entityId}/peers?page=${startPage}&limit=${pageSize}`;
+          const init = `/${apiVersion}/entity/${entityId}/peers?page=1&limit=${pageSize}`;
           do {
             let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
             const extendedData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));

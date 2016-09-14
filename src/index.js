@@ -101,14 +101,14 @@ import {
 
     if (((inputFileType && inputFileType === CLUSTERS_PREFIX && includes(datasets, CLUSTER_MEMBERS_PREFIX)) || (includes(datasets, CLUSTERS_PREFIX) && includes(datasets, CLUSTER_MEMBERS_PREFIX))) && apiVersion === API_VERSION_3) {
       const clusters = await readFileContent({ prefix: CLUSTERS_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
-      const result = await downloadClusterMembersById(CLUSTER_MEMBERS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize);
+      const result = await downloadClusterMembersById(CLUSTER_MEMBERS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize);
       console.log(result);
     }
 
     if (includes(datasets, PEERS_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
       const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
       const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== PEERS_PREFIX))
-        ? await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize)
+        ? await downloadPeersForEntities(PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize)
         : `Dataset ${PEERS_PREFIX} are going to be read from the input file!`;
       console.log(result);
     }
