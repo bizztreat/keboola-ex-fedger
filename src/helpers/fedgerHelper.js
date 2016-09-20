@@ -2,7 +2,6 @@ import fs from 'fs';
 import csv from 'fast-csv';
 import isThere from 'is-there';
 import jsonfile from 'jsonfile';
-import limit from 'simple-rate-limiter';
 import {
   size,
   keys,
@@ -41,7 +40,6 @@ import {
   FEDGER_API_BASE_URL,
   NUMBER_OF_REQUESTS_PER_MINUTE
 } from '../constants';
-const request = limit(require("request")).to(NUMBER_OF_REQUESTS_PER_MINUTE).per(60000);
 
 /**
  * This function simply generate a query string symbol
@@ -66,7 +64,7 @@ export function getUrl(baseUrl, init, uri = init, apiKey) {
 /**
  * This function wraps-up a limited request and returns a promise that can be processed later.
  */
-export function fetchData(url) {
+export function fetchData(request, url) {
   return new Promise((resolve, reject) => {
     request(url, (error, response, body) => {
       if (error) {
@@ -199,7 +197,7 @@ export function convertArrayOfObjectsToObject(inputArray) {
  * This function simply download data for entities.
  * The result is going to be stored in file and processed later.
  */
-export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize) {
+export function downloadDataForEntities(request, prefix, tableOutDir, city, bucketName, apiKey, startPage, maximalPage, apiVersion, pageSize) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -213,7 +211,7 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         const init = `/${apiVersion}/entity/search?page=${startPage}&limit=${pageSize}&city=${city.toLowerCase()}`;
         do {
-          let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+          let { hasMore, next, data, page } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
           const result = size(data) > 0
             ? await createOutputFile(fileName, data)
             : null;
@@ -238,7 +236,7 @@ export function downloadDataForEntities(prefix, tableOutDir, city, bucketName, a
  * This function reads entities and create a file containing extra metadata for each entity.
  * Extra set of metadata contains entity, type, description and tags.
  */
-export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadExtraEntityMetadata(request, prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -251,7 +249,7 @@ export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city,
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
           const next = `/${apiVersion}/entity/${entityId}?expand=${PROFILE_PREFIX}`;
-          const { type, description, tags } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const { type, description, tags } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const data = [{
             entityId,
             type,
@@ -279,7 +277,7 @@ export function downloadExtraEntityMetadata(prefix, entities, tableOutDir, city,
 /**
  * This function takes care of downloading the expanded metadata for each individual entity.
  */
-export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadExpandedDataForEntities(request, prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -289,7 +287,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
         );
         for (const entityId of entities) {
           const next = `/${apiVersion}/entity/${entityId}?expand=${encodeURIComponent(prefixes.join(','))}`
-          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const data = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const { contact, profile, metrics, location } = data;
           const services = Object.assign({}, data.services, {
             onlineMenu: data.services.onlineMenu ? data.services.onlineMenu.join(',') : ''
@@ -315,7 +313,7 @@ export function downloadExpandedDataForEntities(prefixes, entities, tableOutDir,
  * This function handles the download of cluster data.
  * The HTTP response must be extended by parentId information.
  */
-export function downloadClustersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadClustersForEntities(request, prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -328,7 +326,7 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
           const next = `/${apiVersion}/entity/${entityId}/clusters`;
-          const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const { data } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const extendedData = uniqBy(data, 'id').map(cluster => Object.assign({}, cluster, { parentId: entityId }));
           const result = size(extendedData) > 0
             ? await createOutputFile(fileName, extendedData)
@@ -351,7 +349,7 @@ export function downloadClustersForEntities(prefix, entities, tableOutDir, city,
 /**
  * This function handles the download of cluster metrics by id.
  */
-export function downloadClusterMetricsById(prefix, clusters, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadClusterMetricsById(request, prefix, clusters, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -364,7 +362,7 @@ export function downloadClusterMetricsById(prefix, clusters, tableOutDir, city, 
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const clusterId of clusters) {
           const next = `/${apiVersion}/cluster/${clusterId}/metrics`;
-          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const data = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const result = await createOutputFile(fileName, [ data ]);
         }
         const manifest = isThere(fileName)
@@ -384,7 +382,7 @@ export function downloadClusterMetricsById(prefix, clusters, tableOutDir, city, 
 /**
  * This function handles the download of cluster members by id.
  */
-export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
+export function downloadClusterMembersById(request, prefix, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -399,7 +397,7 @@ export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, 
           let hasMoreRecords = false;
           const init = `/${apiVersion}/cluster/${clusterId}/members?page=1&limit=${pageSize}`;
           do {
-            let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+            let { hasMore, next, data, page } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
             const extendedData = data.map(cluster => Object.assign({}, cluster, { parentId: clusterId }));
             const result = size(extendedData) > 0
               ? await createOutputFile(fileName, extendedData)
@@ -425,7 +423,7 @@ export function downloadClusterMembersById(prefix, clusters, tableOutDir, city, 
  * This function handles the download of the peers data.
  * The HTTP response must be extended by parentId information.
  */
-export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
+export function downloadPeersForEntities(request, prefix, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -440,7 +438,7 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
           let hasMoreRecords = false;
           const init = `/${apiVersion}/entity/${entityId}/peers?page=1&limit=${pageSize}`;
           do {
-            let { hasMore, next, data, page } = await fetchData(getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
+            let { hasMore, next, data, page } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, init, next, apiKey));
             const extendedData = data.map(peer => Object.assign({}, peer, { parentId: entityId }));
             const result = size(extendedData) > 0
               ? await createOutputFile(fileName, extendedData)
@@ -466,7 +464,7 @@ export function downloadPeersForEntities(prefix, entities, tableOutDir, city, bu
  * This function handles the download of the reviews data.
  * There seems to be no pagination. Each entity has the exact amount of records.
  */
-export function downloadReviewsOfEntities(prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadReviewsOfEntities(request, prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -479,7 +477,7 @@ export function downloadReviewsOfEntities(prefix, entities, tableOutDir, city, b
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const entityId of entities) {
           const next = `/${apiVersion}/entity/${entityId}/reviews`;
-          const { data } = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const { data } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const extendedData = data.map(review => Object.assign({}, review, { parentId: entityId }));
           const result = size(extendedData) > 0
             ? await createOutputFile(fileName, extendedData)
@@ -502,7 +500,7 @@ export function downloadReviewsOfEntities(prefix, entities, tableOutDir, city, b
 /**
  * This function reads a list of reviews and for each item gets more details.
  */
-export function downloadDetailsOfReviews(prefix, reviews, tableOutDir, city, bucketName, apiKey, apiVersion) {
+export function downloadDetailsOfReviews(request, prefix, reviews, tableOutDir, city, bucketName, apiKey, apiVersion) {
   return new Promise((resolve, reject) => {
     return async function() {
       try {
@@ -515,7 +513,7 @@ export function downloadDetailsOfReviews(prefix, reviews, tableOutDir, city, buc
         } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
         for (const reviewId of reviews) {
           const next = `/${apiVersion}/review/${reviewId}`;
-          const data = await fetchData(getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const data = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
           const result = await createOutputFile(fileName, [ sanitizeReviewDetails(data) ]);
         }
         // If data is successfully downloaded, we can create a manifest file.
