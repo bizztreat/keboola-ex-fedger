@@ -183,6 +183,8 @@ export function sanitizeContact(contact, apiVersion) {
      author: reviewsDetails.author || '',
      datePublished: reviewsDetails.datePublished || '',
      entity: reviewsDetails.entity || '',
-     itemReviewed: reviewsDetails.itemReviewed || ''
+     itemReviewed: reviewsDetails.itemReviewed || '',
+     topics: reviewsDetails.topics || '',
+     sentiment: reviewsDetails.sentiment || ''
    }
  }

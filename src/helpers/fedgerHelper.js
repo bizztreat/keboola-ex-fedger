@@ -67,7 +67,6 @@ export function getUrl(baseUrl, init, uri = init, apiKey) {
  * This function wraps-up a limited request and returns a promise that can be processed later.
  */
 export function fetchData(url) {
-  console.log('url: ', url);
   return new Promise((resolve, reject) => {
     request(url, (error, response, body) => {
       if (error) {
