@@ -39,7 +39,7 @@ Configuration is very straightforward and deeply described below. There are quit
       "inputFileType": "entities"
       "startPage": 1,
       "numberOfPages": 5,
-      "pageSize": 50,
+      "pageSize": 10,
       "numberOfRequestsPerMinute": 44
     }
 
@@ -57,7 +57,9 @@ After the API version is specified, the data for particular dataset will be down
 
 ### Datasets specification
 
-Another option for keeping the number of requests sane is to specify the datasets for download. **This parameter is important**. Valid values are **entities**, **entityMetadata**, **entityDetails**, **clusters**, **clusterMetrics**, **clusterMembers**, **peers**, **reviews** and **reviewsDetails**.
+If you want to download all datasets at once, you need to use parameter **datasets** and specify value **[ "all" ]**. Alongside with this option, you need to specify a file which contains entity ids. This settings help you with downloading all data.
+
+But you can also download datasets separately. For keeping the number of requests sane is to specify the datasets for download. **This parameter is important**. Valid values are **entities**, **entityMetadata**, **entityDetails**, **clusters**, **clusterMetrics**, **clusterMembers**, **peers**, **reviews** and **reviewsDetails**.
 
 There are quite many options how to specify the desired datasets. **The ideal one** seems to be downloading main datasets (**entities**, **peers**, **clusters**, **reviews**) and then specify each of them as a source file (**parameter inputFileType**) and download rest of data in this way.
 
@@ -65,7 +67,7 @@ It's completely up to you have many of them you are going to use per configurati
 
 ### Pagination
 
-Some endpoints (getEntitySearch, getEntityPeers and getClusterMembers) contain quite a few records. On the backend side, a pagination is in place and the download process is able to handle it. The very big limitation of the Fedger.io API is maximal page size of 10 records. This limitation obviously leads into a need to make a lot of requests. There are two optional attributes, **startPage** and **numberOfPages** that helps to manage it. If you decide to not use it, the extractor assumes you want to download everything. Don't forget to specify parameter **pageSize** unless you are happy with its default value of **10**. 
+Some endpoints (getEntitySearch, getEntityPeers and getClusterMembers) contain quite a few records. On the backend side, a pagination is in place and the download process is able to handle it. The very big limitation of the Fedger.io API is maximal page size of 10 records. This limitation obviously leads into a need to make a lot of requests. There are two optional attributes, **startPage** and **numberOfPages** that helps to manage it. If you decide to not use it, the extractor assumes you want to download everything. Don't forget to specify parameter **pageSize** unless you are happy with its default value of **10**.
 
 ### Requests per minute
 

@@ -12,6 +12,7 @@ import {
 } from 'lodash';
 import {
   PAGE_SIZE,
+  ALL_DATASETS,
   API_VERSION_2,
   DEFAULT_API_VERSION,
   DEFAULT_DOWNLOAD_TYPE,
@@ -19,6 +20,8 @@ import {
   SUPPORTED_API_VERSIONS,
   NUMBER_OF_REQUESTS_PER_MINUTE
 } from '../constants';
+import moment from 'moment';
+
 /**
  * This is a simple helper that checks whether the input configuration is valid.
  * If so, the particular object with relevant parameters is returned.
@@ -52,6 +55,10 @@ export function parseConfiguration(configObject) {
     if (inputFileType && size(inputFiles) > 1) {
       reject(`Too many input files selected! Please select exactly one file containing ${inputFileType} information!`);
     }
+    if (includes(datasets, ALL_DATASETS) && size(inputFiles) === 0) {
+      reject('No input file selected! For downloading all datasets please specify an input file which contains a list of entity ids. Check out documentation for more information!');
+    }
+
     const inputFileName = inputFileType && first(inputFiles).destination;
     const apiKey = configObject.get('parameters:#apiKey');
     if (isUndefined(apiKey)) {
@@ -71,11 +78,14 @@ export function parseConfiguration(configObject) {
     const pageSize = configObject.get('parameters:pageSize') || PAGE_SIZE;
     const numberOfRequestsPerMinute = configObject.get('parameters:numberOfRequestsPerMinute') || NUMBER_OF_REQUESTS_PER_MINUTE;
     const maximalPage = getMaximalPage(startPage, numberOfPages);
+    const timestamp = moment().utc().unix();
+
     resolve({
       city,
       apiKey,
       pageSize,
       datasets,
+      timestamp,
       startPage,
       bucketName,
       apiVersion,
@@ -188,3 +198,35 @@ export function sanitizeContact(contact, apiVersion) {
      sentiment: reviewsDetails.sentiment || ''
    }
  }
+
+ /**
+  * This function sanitize services data
+  */
+export function sanitizeServices(servicesDetails) {
+  return {
+    entity: servicesDetails.entity || '',
+    object: servicesDetails.object || '',
+    payment: servicesDetails.payment || '',
+    onlineMenu: servicesDetails.onlineMenu || ''
+  }
+}
+
+/**
+ * This function sanitize metrics dataset
+ */
+export function sanitizeMetrics(metricsDetails) {
+  return {
+    entity: metricsDetails.entity,
+    object: metricsDetails.object,
+    avgDistance20Km: metricsDetails.avgDistance20Km,
+    commentCountDay: metricsDetails.commentCountDay,
+    densityRad20Km: metricsDetails.densityRad20Km,
+    guestCountCheckin: metricsDetails.guestCountCheckin,
+    guestCountMarked: metricsDetails.guestCountMarked,
+    likeCount: metricsDetails.likeCount,
+    peerDensity: metricsDetails.peerDensity,
+    ratingCount: metricsDetails.ratingCount,
+    ratingScore: metricsDetails.ratingScore,
+    reviewCount: metricsDetails.reviewCount
+  }
+}
