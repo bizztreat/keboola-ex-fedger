@@ -7,11 +7,10 @@ export const DEFAULT_TABLES_OUT_DIR = '/out/tables';
 export const DEFAULT_DOWNLOAD_TYPE = false;
 export const API_VERSION_2 = 'v0.2';
 export const API_VERSION_3 = 'v0.3';
-export const API_VERSION_3_4 = 'v0.3.4';
 export const PAGE_SIZE = 10;
 export const NUMBER_OF_REQUESTS_PER_MINUTE = 44;
 export const DEFAULT_API_VERSION = API_VERSION_2;
-export const SUPPORTED_API_VERSIONS = [ API_VERSION_2, API_VERSION_3, API_VERSION_3_4 ];
+export const SUPPORTED_API_VERSIONS = [ API_VERSION_2, API_VERSION_3 ];
 export const ALL_DATASETS = 'all';
 
 
@@ -20,6 +19,7 @@ export const ALL_DATASETS = 'all';
  */
 export const ENTITY_METADATA_FILE_PREFIX = 'type_tags_description';
 export const ENTITY_METADATA_PREFIX = 'entityMetadata';
+export const ENTITY_TEAM_PREFIX = 'entityTeam';
 export const REVIEWS_DETAILS_PREFIX = 'reviewsDetails';
 export const CLUSTER_METRICS_PREFIX = 'clusterMetrics';
 export const CLUSTER_MEMBERS_PREFIX = 'clusterMembers';

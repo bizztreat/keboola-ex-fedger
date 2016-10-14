@@ -319,6 +319,44 @@ export function downloadExtraEntityMetadata(request, prefix, entities, tableOutD
   });
 }
 
+/**
+ * This function reads entities and its teams.
+ */
+export function downloadEntityTeams(request, prefix, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp) {
+  return new Promise((resolve, reject) => {
+    return async function() {
+      try {
+        const {
+          fileName,
+          tableName,
+          destination,
+          incremental,
+          manifestFileName
+        } = getKeboolaStorageMetadata(tableOutDir, bucketName, prefix, city);
+        for (const entityId of entities) {
+          const next = `/${apiVersion}/entity/${entityId}/team`;
+          const { entity, object } = await fetchData(request, getUrl(FEDGER_API_BASE_URL, '', next, apiKey));
+          const data = [{
+            entity,
+            object
+          }];
+          const result = await createOutputFile(fileName, data, timestamp);
+        }
+        // If data is successfully downloaded, we can create a manifest file.
+        const manifest = isThere(fileName)
+          ? await createManifestFile(manifestFileName, { destination, incremental })
+          : null;
+        const outputMessage = !isNull(manifest)
+          ? `Entity team data for '${city}' from API version ${apiVersion} downloaded!`
+          : `No entity team data for '${city}' from API version ${apiVersion} downloaded! Source dataset is empty!`;
+        resolve(outputMessage);
+      } catch (error) {
+        reject(error);
+      }
+    }();
+  });
+}
+
 
 /**
  * This function takes care of downloading the expanded metadata for each individual entity.

@@ -17,6 +17,7 @@ Not every endpoint supported by Fedger.io is currently implemented. Let's sum up
 
 * GET /entity/search ([getEntitySearch](https://chef.fedger.io/v0.3/docs/#!/entity/get_entity_search)) - returns a list of all entities associated with search parameters.  
 * GET /entity/:id?expand='location,contact,profile,metrics,services,completeness' ([getEntity](https://chef.fedger.io/v0.3/docs/#!/entity/get_entity_id)) - returns a detail information about particular entity. Used with expand parameter that get more information about particular areas.
+* GET /entity/:id/team ([getEntityTeam](https://chef.fedger.io/v0.3/docs/#!/entity/get_entity_id_team)) - return entity teams.
 * GET /entity/:id/clusters ([getEntityClusters](https://chef.fedger.io/v0.3/docs/#!/entity/get_entity_id_clusters)) - returns clusters information related to particular entity.
 * GET /cluster/:id/metrics ([getClusterMetrics](https://chef.fedger.io/v0.3/docs/#!/cluster/get_cluster_id_metrics)) - returns metrics related to cluster.
 * GET /cluster/:id/members ([getClusterMembers](https://chef.fedger.io/v0.3/docs/#!/cluster/get_cluster_id_members)) - returns members related to cluster.
@@ -35,7 +36,7 @@ Configuration is very straightforward and deeply described below. There are quit
       "apiVersion": "v0.3",
       "bucketName": "in.c-bucketName",
       "city": "berlin",
-      "datasets": ["entities", "entityMetadata", "entityDetails", "clusters", "clusterMetrics", "clusterMembers", "peers", "reviews", "reviewsDetails"],
+      "datasets": ["entities", "entityMetadata", "entityDetails", "entityTeam", "clusters", "clusterMetrics", "clusterMembers", "peers", "reviews", "reviewsDetails"],
       "inputFileType": "entities"
       "startPage": 1,
       "numberOfPages": 5,
@@ -59,7 +60,7 @@ After the API version is specified, the data for particular dataset will be down
 
 If you want to download all datasets at once, you need to use parameter **datasets** and specify value **[ "all" ]**. Alongside with this option, you need to specify a file which contains entity ids. This settings help you with downloading all data.
 
-But you can also download datasets separately. For keeping the number of requests sane is to specify the datasets for download. **This parameter is important**. Valid values are **entities**, **entityMetadata**, **entityDetails**, **clusters**, **clusterMetrics**, **clusterMembers**, **peers**, **reviews** and **reviewsDetails**.
+But you can also download datasets separately. For keeping the number of requests sane is to specify the datasets for download. **This parameter is important**. Valid values are **entities**, **entityMetadata**, **entityDetails**, **entityTeam**, **clusters**, **clusterMetrics**, **clusterMembers**, **peers**, **reviews** and **reviewsDetails**.
 
 There are quite many options how to specify the desired datasets. **The ideal one** seems to be downloading main datasets (**entities**, **peers**, **clusters**, **reviews**) and then specify each of them as a source file (**parameter inputFileType**) and download rest of data in this way.
 

@@ -8,6 +8,7 @@ import { size, includes, deburr, isUndefined } from 'lodash';
 import {
   readFileContent,
   downloadEntityById,
+  downloadEntityTeams,
   downloadDataForEntities,
   downloadPeersForEntities,
   downloadDetailsOfReviews,
@@ -32,6 +33,7 @@ import {
   ENTITIES_PREFIX,
   LOCATION_PREFIX,
   SERVICES_PREFIX,
+  ENTITY_TEAM_PREFIX,
   COMPLETENESS_PREFIX,
   ENTITY_DETAILS_PREFIX,
   DEFAULT_TABLES_IN_DIR,
@@ -77,20 +79,22 @@ import {
       const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
       // entities expanded
       const entitiesExpandedDownload = await downloadExpandedDataForEntities(request, prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
+      // entities team
+      const entitiesTeamDownload = await downloadEntityTeams(request, ENTITY_TEAM_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
       // clusters
       const clustersDownload = await downloadClustersForEntities(request, CLUSTERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
       const clusters = await readFileContent({ prefix: CLUSTERS_PREFIX, tableOutDir, city, apiVersion });
       // downloadClusterMetricsById
-      const clustersMetricsById = await downloadClusterMetricsById(request, CLUSTER_METRICS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
+      const clustersMetricsByIdDownload = await downloadClusterMetricsById(request, CLUSTER_METRICS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
       // downloadClusterMembersById
-      const clusterMembersById = await downloadClusterMembersById(request, CLUSTER_MEMBERS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize, timestamp);
+      const clusterMembersByIdDownload = await downloadClusterMembersById(request, CLUSTER_MEMBERS_PREFIX, clusters, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize, timestamp);
       // peers for entities
-      const peersForEntities = await downloadPeersForEntities(request, PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize, timestamp);
+      const peersForEntitiesDownload = await downloadPeersForEntities(request, PEERS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, maximalPage, apiVersion, pageSize, timestamp);
       // reviews of entities
-      const reviewsOfEntities = await downloadReviewsOfEntities(request, REVIEWS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
+      const reviewsOfEntitiesDownload = await downloadReviewsOfEntities(request, REVIEWS_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
       const reviews = await readFileContent({ prefix: REVIEWS_PREFIX, tableOutDir, city, apiVersion });
       // reviews details
-      const reviewsDetails = await downloadDetailsOfReviews(request, REVIEWS_DETAILS_PREFIX, reviews, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
+      const reviewsDetailsDownload = await downloadDetailsOfReviews(request, REVIEWS_DETAILS_PREFIX, reviews, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
     } else {
       if (includes(datasets, ENTITIES_PREFIX) && includes(SUPPORTED_API_VERSIONS, apiVersion)) {
         const result = (isUndefined(inputFileType) || (inputFileType && inputFileType !== ENTITIES_PREFIX))
@@ -110,6 +114,12 @@ import {
         const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
         const prefixes = [ LOCATION_PREFIX, CONTACT_PREFIX, PROFILE_PREFIX, METRICS_PREFIX, SERVICES_PREFIX, COMPLETENESS_PREFIX ];
         const result = await downloadExpandedDataForEntities(request, prefixes, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
+        console.log(result);
+      }
+
+      if (includes(datasets, ENTITY_TEAM_PREFIX) && apiVersion === API_VERSION_3) {
+        const entities = await readFileContent({ prefix: ENTITIES_PREFIX, inputFileType, tableInDir, tableOutDir, inputFileName, city, apiVersion });
+        const result =  downloadEntityTeams(request, ENTITY_TEAM_PREFIX, entities, tableOutDir, city, bucketName, apiKey, apiVersion, timestamp);
         console.log(result);
       }
 
