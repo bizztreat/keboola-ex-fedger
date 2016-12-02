@@ -1,0 +1,84 @@
+{
+  "title": "Parameters",
+  "type": "object",
+  "required": [
+    "#apiKey",
+    "apiVersion",
+    "bucketName",
+    "city",
+    "datasets",
+    "inputFileType",
+    "startPage",
+    "numberOfPages",
+    "pageSize",
+    "numberOfRequestsPerMinute"
+  ],
+  "properties": {
+    "#apiKey": {
+      "title": "Api Key",
+      "type": "string",
+      "format": "password",
+      "minLength": 1,
+      "default": ""
+    },
+    "apiVersion": {
+      "title": "Api Version",
+      "type": "string",
+      "minLength": 0,
+      "default": "v0.3"
+    },
+    "bucketName": {
+      "title": "Bucket name",
+      "type": "string",
+      "minLength": 0,
+      "default": ""
+    },
+    "city": {
+      "title": "City",
+      "type": "string",
+      "minLength": 0,
+      "default": ""
+    },
+    "datasets": {
+      "title": "Datasets to download",
+      "type": "array",
+      "items": [ { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }, { "type": "string" }  ],
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "inputFileType": {
+      "title": "Input File Type",
+      "type": "string",
+      "minLength": 0,
+      "default": ""
+    },
+    "startPage": {
+      "title": "Start page",
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 9999
+    },
+    "numberOfPages": {
+      "title": "Number of pages",
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "pageSize": {
+      "title": "Page Size",
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "numberOfRequestsPerMinute": {
+      "title": "Number of requests per minute",
+      "type": "integer",
+      "default": 50,
+      "minimum": 1,
+      "maximum": 99
+    }
+  }
+}
