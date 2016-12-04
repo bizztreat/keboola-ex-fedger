@@ -6,7 +6,8 @@ The Keboola Fedger.io Extractor is built and offered by Bizztreat, s.r.o as a th
 
 BizzTreat, s.r.o
 
-Bubenská 1477/1  
+Bubenská 1477/1
+
 Prague
 
 email: support@bizztreat.com

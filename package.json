@@ -13,8 +13,8 @@
     "Keboola",
     "Node.js"
   ],
-  "author": "Radek Tomasek <radek@bluesky.pro>",
-  "license": "ISC",
+  "author": "Radek Tomasek <radek.tomasek@gmail.com>",
+  "license": "NONE",
   "bugs": {
     "url": "https://github.com/blueskydigital/keboola-ex-fedger/issues"
   },
